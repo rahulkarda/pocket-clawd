@@ -1,19 +1,20 @@
 {
-  "name": "pocket-claude",
-  "version": "0.3.0",
-  "description": "A pocket-sized Claude that lives in your macOS menubar — pixel-art mascot, time-aware chat, daily todos.",
+  "name": "pocket-clawd",
+  "version": "0.4.0",
+  "description": "A pocket-sized Clawd that lives in your macOS menubar — pixel-art mascot, time-aware chat, persistent memory, web search, todo tools.",
   "main": "out/main/index.js",
   "license": "MIT",
   "private": true,
-  "homepage": "https://github.com/rahulkarda/pocket-claude",
+  "homepage": "https://github.com/rahulkarda/pocket-clawd",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rahulkarda/pocket-claude.git"
+    "url": "git+https://github.com/rahulkarda/pocket-clawd.git"
   },
   "bugs": {
-    "url": "https://github.com/rahulkarda/pocket-claude/issues"
+    "url": "https://github.com/rahulkarda/pocket-clawd/issues"
   },
   "keywords": [
+    "clawd",
     "claude",
     "anthropic",
     "electron",
@@ -21,6 +22,9 @@
     "menubar",
     "tray",
     "ai-assistant",
+    "ai-companion",
+    "tool-use",
+    "memory",
     "pixel-art"
   ],
   "scripts": {

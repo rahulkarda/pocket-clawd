@@ -176,7 +176,7 @@ async function bootstrap(): Promise<void> {
     watchForApiKey()
   }
 
-  logger.info('Claude tray widget ready')
+  logger.info('Pocket Clawd ready')
 }
 
 app.whenReady().then(() => {
@@ -192,7 +192,7 @@ app.whenReady().then(() => {
 // it actually close this time. Fires for tray "Quit Claude", Cmd+Q, and
 // any programmatic app.quit().
 app.on('before-quit', () => {
-  globalThis.__pocketClaudeQuitting = true
+  globalThis.__pocketClawdQuitting = true
 })
 
 app.on('will-quit', () => {

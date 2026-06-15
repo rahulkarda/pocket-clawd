@@ -5,7 +5,7 @@
 import keytar from 'keytar'
 import logger from './logger'
 
-const SERVICE = 'pocket-claude'
+const SERVICE = 'pocket-clawd'
 const ACCOUNT = 'anthropic-api-key'
 
 export async function setApiKey(key: string): Promise<void> {

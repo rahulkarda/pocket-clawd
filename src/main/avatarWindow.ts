@@ -13,7 +13,7 @@ declare global {
   // The avatar window's close handler reads this to distinguish "user closed
   // the window" (block & hide) from "the whole app is quitting" (let it close).
   // eslint-disable-next-line no-var
-  var __pocketClaudeQuitting: boolean | undefined
+  var __pocketClawdQuitting: boolean | undefined
 }
 
 let win: BrowserWindow | null = null
@@ -74,10 +74,10 @@ export function createAvatarWindow(): BrowserWindow {
    * kill the user's only way back into chat. Block close attempts (Cmd+W,
    * window-control buttons, etc.) by reshowing the window. The only way to
    * exit is the tray "Quit Claude" item or Cmd+Q, which set the global
-   * __pocketClaudeQuitting flag before triggering the close.
+   * __pocketClawdQuitting flag before triggering the close.
    */
   win.on('close', (e) => {
-    if (!globalThis.__pocketClaudeQuitting) {
+    if (!globalThis.__pocketClawdQuitting) {
       e.preventDefault()
       win?.hide()
       setTimeout(() => win?.show(), 50)

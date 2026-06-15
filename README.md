@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="assets/clawd-active.svg" width="120" height="120" alt="Clawd, the pocket-claude mascot" />
+<img src="assets/clawd-active.svg" width="120" height="120" alt="Clawd, the pocket-clawd mascot" />
 
-# pocket-claude
+# pocket-clawd
 
 **A pocket-sized Claude that lives in your macOS menubar.**
 
@@ -22,7 +22,7 @@ A floating pixel-art mascot. Time-aware check-ins. Daily todos with a live progr
 
 ## Meet Clawd
 
-Clawd is the pixel-art mascot at the heart of pocket-claude. It lives in the corner of your screen, breathes gently, and shifts mood through the day.
+Clawd is the pixel-art mascot at the heart of pocket-clawd. It lives in the corner of your screen, breathes gently, and shifts mood through the day.
 
 <table align="center">
   <tr>
@@ -45,7 +45,7 @@ Pure pixel art — every shape is an axis-aligned rect on a 4 px grid. The four 
 
 ## Why
 
-LLM chat windows are great when you remember to open them, and forgotten the rest of the day. pocket-claude flips that: the assistant lives next to your work, asks you one focused question at the hour that matters, and quietly saves a structured record of what you said.
+LLM chat windows are great when you remember to open them, and forgotten the rest of the day. pocket-clawd flips that: the assistant lives next to your work, asks you one focused question at the hour that matters, and quietly saves a structured record of what you said.
 
 | Hour | Slot | Default opener |
 |---:|---|---|
@@ -78,8 +78,8 @@ The persona Claude adopts is yours to shape — fully editable in Settings.
 > **Requires:** macOS 13+, Node.js 20+, an Anthropic API key.
 
 ```bash
-git clone https://github.com/rahulkarda/pocket-claude.git
-cd pocket-claude
+git clone https://github.com/rahulkarda/pocket-clawd.git
+cd pocket-clawd
 npm install
 npm run build:icons    # rasterizes the tray template SVG to PNG (needs sharp)
 npm run dev
@@ -179,7 +179,7 @@ assets/
 3. The main process opens an SDK stream and forwards each text delta back to the chat renderer over IPC for token-by-token display.
 4. When the stream completes, main scans the accumulated text for `<SPEC_READY>...</SPEC_READY>`. If present, the block is written to `~/Documents/claude-sessions/<date>_<time>.spec.md` together with the formatted transcript.
 
-> **Note on stop sequences:** Anthropic's `stop_sequences` parameter would terminate generation right at the opening tag, so the body would never be returned. Instead, pocket-claude lets the response complete naturally and parses the closing tag once the stream ends. This keeps streaming UX intact.
+> **Note on stop sequences:** Anthropic's `stop_sequences` parameter would terminate generation right at the opening tag, so the body would never be returned. Instead, pocket-clawd lets the response complete naturally and parses the closing tag once the stream ends. This keeps streaming UX intact.
 
 ---
 

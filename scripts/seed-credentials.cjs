@@ -3,7 +3,7 @@
  * Run BEFORE `npm run dev` if you want to skip the Settings UI on first launch.
  *
  * Reads:
- *   ANTHROPIC_API_KEY      → Keychain (service=pocket-claude, account=anthropic-api-key)
+ *   ANTHROPIC_API_KEY      → Keychain (service=pocket-clawd, account=anthropic-api-key)
  *   ANTHROPIC_BASE_URL     → settings.json baseURL (optional; only needed if you
  *                            route Anthropic API calls through a custom proxy)
  *
@@ -14,7 +14,7 @@ const path = require('path')
 const fs = require('fs')
 const os = require('os')
 
-const APP_NAME = 'pocket-claude'
+const APP_NAME = 'pocket-clawd'
 
 async function main() {
   const apiKey = process.env.ANTHROPIC_API_KEY
