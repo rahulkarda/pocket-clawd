@@ -118,12 +118,63 @@ export function Avatar(): JSX.Element {
   const allDone = total > 0 && ratio === 1
   const variant: AvatarAnimState | 'happy' = allDone ? 'happy' : state
 
-  const onClick = (): void => {
-    void window.api.chat.open()
+  /**
+   * Drag handling.
+   * - mousedown captures the screen-space cursor position and seeds the drag offset in main
+   * - mousemove streams new cursor positions to main; main moves the window
+   * - mouseup ends the drag, edge-snaps, and persists the position
+   * - if the cursor never moved more than 5 px (manhattan), treat as a click → open chat
+   *
+   * We use clientX/Y plus window.screenX/Y to compute screen-space coords,
+   * because the renderer doesn't have direct access to the mouse's
+   * absolute screen position.
+   */
+  const dragRef = useRef<{
+    downAt: { x: number; y: number }
+    moved: boolean
+  } | null>(null)
+  const CLICK_THRESHOLD_PX = 5
+
+  const onMouseDown = (e: React.MouseEvent): void => {
+    if (e.button !== 0) return // only primary button
+    const screenX = e.screenX
+    const screenY = e.screenY
+    dragRef.current = { downAt: { x: screenX, y: screenY }, moved: false }
+    void window.api.avatar.dragStart(screenX, screenY)
+
+    const onMove = (ev: MouseEvent): void => {
+      if (!dragRef.current) return
+      const dx = ev.screenX - dragRef.current.downAt.x
+      const dy = ev.screenY - dragRef.current.downAt.y
+      if (!dragRef.current.moved && Math.abs(dx) + Math.abs(dy) > CLICK_THRESHOLD_PX) {
+        dragRef.current.moved = true
+      }
+      if (dragRef.current.moved) {
+        void window.api.avatar.dragTo(ev.screenX, ev.screenY)
+      }
+    }
+
+    const onUp = (): void => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      const moved = dragRef.current?.moved ?? false
+      dragRef.current = null
+      void window.api.avatar.dragEnd()
+      if (!moved) {
+        // Tap on the avatar with no drag → open chat.
+        void window.api.chat.open()
+      }
+    }
+
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
   }
 
   return (
-    <div className="drag w-full h-full relative flex items-center justify-center">
+    <div
+      className="w-full h-full relative flex items-center justify-center cursor-grab active:cursor-grabbing"
+      onMouseDown={onMouseDown}
+    >
       {/* Glow */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -148,11 +199,10 @@ export function Avatar(): JSX.Element {
       )}
 
       <motion.div
-        className="no-drag relative pixel cursor-pointer"
+        className="relative pixel pointer-events-none"
         style={{ width: size * 0.78, height: size * 0.78 }}
         variants={VARIANTS}
         animate={variant}
-        onClick={onClick}
       >
         <Clawd
           state={allDone ? 'idle' : state}
@@ -171,7 +221,7 @@ export function Avatar(): JSX.Element {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.6 }}
-            className="no-drag absolute -top-8 px-3 py-1 rounded-full bg-[#1A1A2E] text-textMain text-xs whitespace-nowrap shadow-lg border border-accent/30"
+            className="pointer-events-none absolute -top-8 px-3 py-1 rounded-full bg-[#1A1A2E] text-textMain text-xs whitespace-nowrap shadow-lg border border-accent/30"
           >
             {whisper.text}
           </motion.div>

@@ -30,12 +30,12 @@ export function createTray(actions: TrayActions): Tray {
   }
 
   tray = new Tray(img)
-  tray.setToolTip('Claude')
+  tray.setToolTip('Clawd')
 
   tray.on('click', () => actions.onOpenChat())
   tray.on('right-click', () => {
     const menu = Menu.buildFromTemplate([
-      { label: 'Open Claude', accelerator: 'Cmd+Shift+C', click: () => actions.onOpenChat() },
+      { label: 'Open Clawd', accelerator: 'Cmd+Shift+C', click: () => actions.onOpenChat() },
       { type: 'separator' },
       {
         label: 'View last session',
@@ -47,7 +47,7 @@ export function createTray(actions: TrayActions): Tray {
       },
       { label: 'Settings…', click: () => actions.onOpenSettings() },
       { type: 'separator' },
-      { label: 'Quit Claude', role: 'quit', click: () => actions.onQuit() }
+      { label: 'Quit Clawd', role: 'quit', click: () => actions.onQuit() }
     ])
     if (tray) tray.popUpContextMenu(menu)
   })

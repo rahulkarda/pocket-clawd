@@ -31,7 +31,7 @@ import {
   createSettingsWindow,
   closeSettingsWindow
 } from './secondaryWindows'
-import { resizeAvatar, getAvatarWindow } from './avatarWindow'
+import { resizeAvatar, getAvatarWindow, startDrag, dragTo, endDrag } from './avatarWindow'
 import { showAvatarContextMenu, type AvatarMenuActions } from './avatarMenu'
 import { registerHotkey } from './hotkey'
 import type { ChatMessage, AppSettings, ChatStreamEvent } from '@shared/types'
@@ -232,6 +232,11 @@ export function registerIpc(actions: AppActions): void {
     const w = getAvatarWindow()
     if (w) showAvatarContextMenu(w, actions)
   })
+  // Drag protocol: renderer sends mouse-screen coords on each phase.
+  // We stay in screen space (not client) so multi-display setups Just Work.
+  ipcMain.handle(IPC.AVATAR_DRAG_START, (_e, x: number, y: number) => startDrag(x, y))
+  ipcMain.handle(IPC.AVATAR_DRAG_TO, (_e, x: number, y: number) => dragTo(x, y))
+  ipcMain.handle(IPC.AVATAR_DRAG_END, () => endDrag())
 
   // ─── App ────────────────────────────────────────────
   ipcMain.handle(IPC.APP_QUIT, () => app.quit())

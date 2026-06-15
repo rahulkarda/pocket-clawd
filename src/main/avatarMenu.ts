@@ -36,7 +36,7 @@ export function showAvatarContextMenu(win: BrowserWindow, actions: AvatarMenuAct
     { type: 'separator' },
     { label: 'Settings…', click: () => actions.onOpenSettings() },
     { type: 'separator' },
-    { label: 'Quit Claude', role: 'quit', click: () => actions.onQuit() }
+    { label: 'Quit Clawd', role: 'quit', click: () => actions.onQuit() }
   ])
 
   menu.popup({ window: win })

@@ -39,11 +39,12 @@ export function createAvatarWindow(): BrowserWindow {
     y: pos.y,
     frame: false,
     transparent: true,
+    backgroundColor: '#00000000', // RGBA 0 alpha — kills the default opaque fill
     hasShadow: false,
     resizable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
-    movable: true,
+    movable: false, // we drag via JS to support click-vs-drag detection
     focusable: true,
     type: 'panel',
     webPreferences: {
@@ -63,17 +64,10 @@ export function createAvatarWindow(): BrowserWindow {
     void win.loadFile(path.join(__dirname, '../renderer/avatar.html'))
   }
 
-  win.on('moved', () => {
-    if (!win) return
-    const [x, y] = win.getPosition()
-    const snapped = snapToEdge(x, y, size)
-    if (snapped) {
-      win.setPosition(snapped.x, snapped.y, true)
-      settingsStore().update({ avatarPosition: snapped })
-    } else {
-      settingsStore().update({ avatarPosition: { x, y } })
-    }
-  })
+  // Note: window 'moved' events fire only when the OS moves the window
+  // (e.g. setPosition or native drag from movable:true). Since we now drive
+  // drag entirely via JS in the renderer (movable:false above), position
+  // persistence happens in endDrag() — no 'moved' listener needed.
 
   /**
    * The avatar is the app's anchor — closing it would orphan the tray and
@@ -130,6 +124,43 @@ function snapToEdge(
 
 export function getAvatarWindow(): BrowserWindow | null {
   return win
+}
+
+/**
+ * Drag state for the JS-driven move. We track the screen-space delta between
+ * cursor and window origin at mouseDown, then on each mouseMove translate the
+ * cursor's new screen position back to the window origin.
+ */
+let dragOffset: { dx: number; dy: number } | null = null
+
+export function startDrag(cursorScreenX: number, cursorScreenY: number): void {
+  if (!win || win.isDestroyed()) return
+  const [wx, wy] = win.getPosition()
+  dragOffset = { dx: cursorScreenX - wx, dy: cursorScreenY - wy }
+}
+
+export function dragTo(cursorScreenX: number, cursorScreenY: number): void {
+  if (!win || win.isDestroyed() || !dragOffset) return
+  const nx = Math.round(cursorScreenX - dragOffset.dx)
+  const ny = Math.round(cursorScreenY - dragOffset.dy)
+  win.setPosition(nx, ny, false)
+}
+
+export function endDrag(): void {
+  if (!win || win.isDestroyed() || !dragOffset) {
+    dragOffset = null
+    return
+  }
+  const [size] = win.getSize()
+  const [x, y] = win.getPosition()
+  const snapped = snapToEdge(x, y, size)
+  if (snapped) {
+    win.setPosition(snapped.x, snapped.y, true)
+    settingsStore().update({ avatarPosition: snapped })
+  } else {
+    settingsStore().update({ avatarPosition: { x, y } })
+  }
+  dragOffset = null
 }
 
 export function resizeAvatar(newSize: number): void {

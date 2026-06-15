@@ -53,6 +53,9 @@ declare global {
       avatar: {
         resize: (size: number) => Promise<void>
         showContextMenu: () => Promise<void>
+        dragStart: (x: number, y: number) => Promise<void>
+        dragTo: (x: number, y: number) => Promise<void>
+        dragEnd: () => Promise<void>
         onAnimState: (cb: (s: AvatarAnimState) => void) => () => void
         onWhisper: (cb: (w: WhisperEvent) => void) => () => void
       }

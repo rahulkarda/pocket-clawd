@@ -37,6 +37,9 @@ export const IPC = {
   // ─── Avatar ─────────────────────────────────────────
   AVATAR_RESIZE: 'avatar:resize',
   AVATAR_MOVE: 'avatar:move',
+  AVATAR_DRAG_START: 'avatar:drag-start',
+  AVATAR_DRAG_TO: 'avatar:drag-to',
+  AVATAR_DRAG_END: 'avatar:drag-end',
   AVATAR_ANIM_STATE: 'avatar:anim-state', // broadcast
   AVATAR_WHISPER: 'avatar:whisper', // broadcast
   AVATAR_CONTEXT_MENU: 'avatar:context-menu',

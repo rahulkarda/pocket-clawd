@@ -73,6 +73,11 @@ const api = {
   avatar: {
     resize: (size: number): Promise<void> => ipcRenderer.invoke(IPC.AVATAR_RESIZE, size),
     showContextMenu: (): Promise<void> => ipcRenderer.invoke(IPC.AVATAR_CONTEXT_MENU),
+    dragStart: (x: number, y: number): Promise<void> =>
+      ipcRenderer.invoke(IPC.AVATAR_DRAG_START, x, y),
+    dragTo: (x: number, y: number): Promise<void> =>
+      ipcRenderer.invoke(IPC.AVATAR_DRAG_TO, x, y),
+    dragEnd: (): Promise<void> => ipcRenderer.invoke(IPC.AVATAR_DRAG_END),
     onAnimState: (cb: (s: AvatarAnimState) => void): (() => void) => {
       const listener = (_e: unknown, s: AvatarAnimState): void => cb(s)
       ipcRenderer.on(IPC.AVATAR_ANIM_STATE, listener)
