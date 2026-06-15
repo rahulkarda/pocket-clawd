@@ -9,6 +9,7 @@ import * as keychain from './keychain'
 import { settingsStore } from './settings'
 import { resetClient, streamChat } from './anthropicClient'
 import { extractSpec, stripSpecBlock, writeSpec, setLastSpec } from './specWriter'
+import { clearMemory, getMemoryRoot } from './memory'
 import idleTracker from './idleTracker'
 import {
   addTodo,
@@ -140,6 +141,22 @@ export function registerIpc(actions: AppActions): void {
   ipcMain.handle(IPC.SETTINGS_OPEN_LOGIN_ITEMS_PANE, async () => {
     // macOS deep link straight to the Login Items pane.
     await shell.openExternal('x-apple.systempreferences:com.apple.LoginItems-Settings.extension')
+  })
+
+  /**
+   * Clear all of Clawd's persistent memory — wipes ~/Documents/clawd-memory/.
+   * Returns void on success, throws on failure (renderer surfaces the message).
+   */
+  ipcMain.handle(IPC.SETTINGS_CLEAR_MEMORY, async () => {
+    await clearMemory()
+  })
+
+  /** Open the memory folder in Finder so the user can inspect/edit/back up. */
+  ipcMain.handle(IPC.SETTINGS_OPEN_MEMORY_DIR, async () => {
+    const root = getMemoryRoot()
+    // Ensure the dir exists before asking Finder to open it.
+    await import('fs').then((fs) => fs.promises.mkdir(root, { recursive: true }))
+    await shell.openPath(root)
   })
 
   // ─── Window control ─────────────────────────────────

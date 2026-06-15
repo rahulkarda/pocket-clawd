@@ -27,7 +27,9 @@ const api = {
     loginItemStatus: (): Promise<{ wanted: boolean; actual: boolean; mismatch: boolean }> =>
       ipcRenderer.invoke(IPC.SETTINGS_LOGIN_ITEM_STATUS),
     openLoginItemsPane: (): Promise<void> =>
-      ipcRenderer.invoke(IPC.SETTINGS_OPEN_LOGIN_ITEMS_PANE)
+      ipcRenderer.invoke(IPC.SETTINGS_OPEN_LOGIN_ITEMS_PANE),
+    clearMemory: (): Promise<void> => ipcRenderer.invoke(IPC.SETTINGS_CLEAR_MEMORY),
+    openMemoryDir: (): Promise<void> => ipcRenderer.invoke(IPC.SETTINGS_OPEN_MEMORY_DIR)
   },
 
   // ─── Windows ────────────────────────────────────────

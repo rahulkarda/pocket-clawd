@@ -14,6 +14,7 @@ export function SettingsApp(): JSX.Element {
   const [savingKey, setSavingKey] = useState(false)
   const [savedFlash, setSavedFlash] = useState<string | null>(null)
   const [loginItemMismatch, setLoginItemMismatch] = useState(false)
+  const [clearingMemory, setClearingMemory] = useState(false)
 
   // Compare what the user wants (settings.openAtLogin) with what macOS
   // actually has registered. Unsigned apps fail setLoginItemSettings
@@ -67,6 +68,19 @@ export function SettingsApp(): JSX.Element {
     await window.api.settings.clearApiKey()
     setKeyPresent(false)
     flash('API key cleared')
+  }
+
+  const clearMemoryAction = async (): Promise<void> => {
+    if (!confirm("Wipe all of Clawd's persistent memory? This can't be undone.")) return
+    setClearingMemory(true)
+    try {
+      await window.api.settings.clearMemory()
+      flash('Memory cleared')
+    } catch (err) {
+      alert(`Failed to clear memory: ${(err as Error).message}`)
+    } finally {
+      setClearingMemory(false)
+    }
   }
 
   const pickDir = async (): Promise<void> => {
@@ -265,6 +279,39 @@ export function SettingsApp(): JSX.Element {
             value={settings.showOnAllSpaces}
             onChange={(v) => update({ showOnAllSpaces: v })}
           />
+        </Section>
+
+        <Section
+          title="Tools & memory"
+          hint="Clawd uses tools to manage todos, search past sessions, browse the web, and remember things between sessions."
+        >
+          <Toggle
+            label="Web search (Anthropic-hosted, billed per use)"
+            value={settings.enableWebSearch}
+            onChange={(v) => update({ enableWebSearch: v })}
+          />
+          <Toggle
+            label="Persistent memory across sessions"
+            value={settings.enableMemory}
+            onChange={(v) => update({ enableMemory: v })}
+          />
+          {settings.enableMemory && (
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={() => void window.api.settings.openMemoryDir()}
+                className="px-3 py-1.5 rounded-lg bg-bubble-user text-textMain text-xs hover:bg-bubble-user/80"
+              >
+                Open memory folder
+              </button>
+              <button
+                onClick={clearMemoryAction}
+                disabled={clearingMemory}
+                className="px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/40 text-red-300 text-xs hover:bg-red-500/30 disabled:opacity-50"
+              >
+                {clearingMemory ? 'Clearing…' : 'Clear memory'}
+              </button>
+            </div>
+          )}
         </Section>
 
         <Section title="Persona / system context" hint="Injected into the chat system prompt.">

@@ -26,6 +26,8 @@ declare global {
         pickOutputDir: () => Promise<string | null>
         loginItemStatus: () => Promise<{ wanted: boolean; actual: boolean; mismatch: boolean }>
         openLoginItemsPane: () => Promise<void>
+        clearMemory: () => Promise<void>
+        openMemoryDir: () => Promise<void>
       }
       chat: {
         open: () => Promise<void>

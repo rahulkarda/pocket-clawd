@@ -25,6 +25,7 @@ import { settingsStore } from './settings'
 import { getDaily } from './todoStore'
 import { getTimeSlot, timeSlotLabel } from '@shared/time'
 import { runTool, TOOLS } from './tools'
+import { runMemory } from './memory'
 import type { ChatMessage, TimeSlot } from '@shared/types'
 
 const SYSTEM_TEMPLATE = (
@@ -138,7 +139,7 @@ type AnyMessageParam = Anthropic.MessageParam
 
 /**
  * Build the tools array based on user settings.
- * Custom tools always available; server-side tools per Settings.
+ * Custom tools always available; server-side and memory per Settings.
  */
 function buildTools(): Anthropic.Messages.ToolUnion[] {
   const s = settingsStore().get()
@@ -155,7 +156,13 @@ function buildTools(): Anthropic.Messages.ToolUnion[] {
       max_uses: 5
     } as Anthropic.Messages.WebSearchTool20260209)
   }
-  // Memory tool wired in Phase C — TOOLS list will gain memory_20250818 there.
+  // Persistent memory — Anthropic memory_20250818 backed by local fs.
+  if (s.enableMemory) {
+    tools.push({
+      type: 'memory_20250818',
+      name: 'memory'
+    } as Anthropic.Messages.MemoryTool20250818)
+  }
   return tools
 }
 
@@ -222,12 +229,15 @@ export async function streamChat(
       }
 
       // Run every requested tool, gather tool_result blocks for the next user turn.
+      // Note: server-side tools (web_search) execute on Anthropic's side; only
+      // client-side tools (custom + memory) appear as ToolUseBlock here.
       const toolUses = final.content.filter(
         (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use'
       )
       const toolResults: Anthropic.ToolResultBlockParam[] = []
       for (const tu of toolUses) {
-        const result = await runTool(tu.name, tu.input)
+        const result =
+          tu.name === 'memory' ? await runMemory(tu.input) : await runTool(tu.name, tu.input)
         toolResults.push({
           type: 'tool_result',
           tool_use_id: tu.id,

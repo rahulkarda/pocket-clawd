@@ -10,6 +10,8 @@ export const IPC = {
   SETTINGS_PICK_OUTPUT_DIR: 'settings:outputDir:pick',
   SETTINGS_LOGIN_ITEM_STATUS: 'settings:loginItem:status',
   SETTINGS_OPEN_LOGIN_ITEMS_PANE: 'settings:loginItem:openPane',
+  SETTINGS_CLEAR_MEMORY: 'settings:memory:clear',
+  SETTINGS_OPEN_MEMORY_DIR: 'settings:memory:openDir',
 
   // ─── Window control ─────────────────────────────────
   CHAT_OPEN: 'chat:open',
