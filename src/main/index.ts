@@ -98,6 +98,15 @@ async function bootstrap(): Promise<void> {
   const settings = settingsStore().get()
   idleTracker.setThresholdMinutes(settings.idleAlertMinutes)
 
+  // Apply the persisted "open at login" setting on every launch so it
+  // stays in sync if the user re-installed or moved the .app bundle.
+  // Hidden:true means the avatar is suppressed at first; the tray icon
+  // still appears and Cmd+Shift+C still opens chat.
+  app.setLoginItemSettings({
+    openAtLogin: settings.openAtLogin,
+    openAsHidden: false
+  })
+
   // ─── Tray ─────────────────────────────────────────────
   createTray({
     onOpenChat: () => openChatWithLifecycle(),
@@ -176,6 +185,14 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createAvatarWindow()
   })
+})
+
+// Mark that we're quitting BEFORE windows start closing, so the avatar
+// window's close-blocker (which would normally re-show it on Cmd+W) lets
+// it actually close this time. Fires for tray "Quit Claude", Cmd+Q, and
+// any programmatic app.quit().
+app.on('before-quit', () => {
+  globalThis.__pocketClaudeQuitting = true
 })
 
 app.on('will-quit', () => {

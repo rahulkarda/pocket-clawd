@@ -8,6 +8,14 @@ import logger from './logger'
 import { settingsStore } from './settings'
 import { clamp } from '@shared/time'
 
+declare global {
+  // Set to true once the user has explicitly chosen to quit (tray menu, Cmd+Q).
+  // The avatar window's close handler reads this to distinguish "user closed
+  // the window" (block & hide) from "the whole app is quitting" (let it close).
+  // eslint-disable-next-line no-var
+  var __pocketClaudeQuitting: boolean | undefined
+}
+
 let win: BrowserWindow | null = null
 
 function defaultPosition(size: number): { x: number; y: number } {
@@ -64,6 +72,21 @@ export function createAvatarWindow(): BrowserWindow {
       settingsStore().update({ avatarPosition: snapped })
     } else {
       settingsStore().update({ avatarPosition: { x, y } })
+    }
+  })
+
+  /**
+   * The avatar is the app's anchor — closing it would orphan the tray and
+   * kill the user's only way back into chat. Block close attempts (Cmd+W,
+   * window-control buttons, etc.) by reshowing the window. The only way to
+   * exit is the tray "Quit Claude" item or Cmd+Q, which set the global
+   * __pocketClaudeQuitting flag before triggering the close.
+   */
+  win.on('close', (e) => {
+    if (!globalThis.__pocketClaudeQuitting) {
+      e.preventDefault()
+      win?.hide()
+      setTimeout(() => win?.show(), 50)
     }
   })
 
