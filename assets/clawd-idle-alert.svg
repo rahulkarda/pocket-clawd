@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" shape-rendering="crispEdges">
+  <!-- Clawd · idle-alert (sleepy · drooped arms · zzz) -->
+  <!-- Ascending Z-Z-Z -->
+  <rect x="36" y="2"  width="6" height="2" fill="#F5C542"/>
+  <rect x="40" y="4"  width="2" height="2" fill="#F5C542"/>
+  <rect x="36" y="6"  width="6" height="2" fill="#F5C542"/>
+  <rect x="30" y="8"  width="4" height="2" fill="#F5C542"/>
+  <rect x="32" y="10" width="2" height="2" fill="#F5C542"/>
+  <rect x="30" y="12" width="4" height="2" fill="#F5C542"/>
+  <!-- Drooped arms -->
+  <rect x="2"  y="22" width="6" height="4" rx="1" fill="#C45A25"/>
+  <rect x="2"  y="22" width="4" height="10" rx="1" fill="#C45A25"/>
+  <rect x="56" y="22" width="6" height="4" rx="1" fill="#C45A25"/>
+  <rect x="60" y="22" width="4" height="10" rx="1" fill="#C45A25"/>
+  <!-- Body -->
+  <rect x="8"  y="14" width="48" height="32" rx="4" fill="#C45A25"/>
+  <rect x="8"  y="42" width="48" height="4"  fill="#9A4119"/>
+  <!-- Eye sockets -->
+  <rect x="18" y="20" width="8"  height="10" rx="2" fill="#1a1208"/>
+  <rect x="38" y="20" width="8"  height="10" rx="2" fill="#1a1208"/>
+  <!-- Eyelids covering top half — squinted -->
+  <rect x="18" y="20" width="8"  height="6" fill="#C45A25"/>
+  <rect x="38" y="20" width="8"  height="6" fill="#C45A25"/>
+  <!-- Lash line under lid -->
+  <rect x="18" y="26" width="8"  height="2" fill="#1a1208"/>
+  <rect x="38" y="26" width="8"  height="2" fill="#1a1208"/>
+  <!-- Legs -->
+  <rect x="14" y="46" width="8"  height="12" rx="2" fill="#C45A25"/>
+  <rect x="28" y="46" width="8"  height="12" rx="2" fill="#C45A25"/>
+  <rect x="42" y="46" width="8"  height="12" rx="2" fill="#C45A25"/>
+  <rect x="14" y="56" width="8"  height="2"  fill="#9A4119"/>
+  <rect x="28" y="56" width="8"  height="2"  fill="#9A4119"/>
+  <rect x="42" y="56" width="8"  height="2"  fill="#9A4119"/>
+</svg>
