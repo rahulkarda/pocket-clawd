@@ -1,245 +1,394 @@
 <div align="center">
 
-<img src="assets/clawd-active.svg" width="120" height="120" alt="Clawd, the pocket-clawd mascot" />
-
 # pocket-clawd
 
-**A pocket-sized Claude that lives in your macOS menubar.**
+**A pocket-sized Clawd that lives in your macOS menubar.**
+Pixel-art mascot. Time-aware chat. Persistent memory. Tool use that runs your day.
 
-A floating pixel-art mascot. Time-aware check-ins. Daily todos with a live progress ring. Sessions saved as structured markdown.
-
-[![Electron 32](https://img.shields.io/badge/electron-32-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
-[![React 18](https://img.shields.io/badge/react-18-61DAFB?logo=react&logoColor=white)](https://react.dev/)
-[![TypeScript strict](https://img.shields.io/badge/typescript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tailwind 3](https://img.shields.io/badge/tailwind-3-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![Anthropic SDK](https://img.shields.io/badge/anthropic--sdk-0.30-D97757)](https://github.com/anthropics/anthropic-sdk-typescript)
-[![macOS](https://img.shields.io/badge/macOS-13%2B-000000?logo=apple)](https://www.apple.com/macos/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![version](https://img.shields.io/badge/version-0.4.0-D4622A?style=flat-square)](https://github.com/rahulkarda/pocket-clawd)
+[![platform](https://img.shields.io/badge/platform-macOS%2013%2B-1a1208?style=flat-square)](https://github.com/rahulkarda/pocket-clawd)
+[![license](https://img.shields.io/badge/license-MIT-E87030?style=flat-square)](LICENSE)
+[![sdk](https://img.shields.io/badge/anthropic--sdk-0.104.1-F5C542?style=flat-square)](https://github.com/anthropics/anthropic-sdk-typescript)
 
 </div>
+
+---
+
+Clawd lives on top of every space and every fullscreen app. He pulses gently while you work. He checks in at the right moments — not the wrong ones. Click him, a chat panel springs from his corner and Anthropic's SDK starts streaming. He remembers things across sessions, searches the web when needed, and manages your daily todos directly from the conversation. Finish them all and he bursts into a little pixel-art happy dance.
+
+Type `done` and the conversation lands on disk as a structured markdown spec. Open the app tomorrow and Clawd already knows your name, the project you were stuck on, and which todos you carried over.
 
 ---
 
 ## Meet Clawd
 
-Clawd is the pixel-art mascot at the heart of pocket-clawd. It lives in the corner of your screen, breathes gently, and shifts mood through the day.
+Four states, all hand-placed `<rect>` elements on a 4px grid. No raster, no sprite sheet, no `transform: scale()` cheating — pure pixel art that scales crisply from 40px to 120px.
 
-<table align="center">
-  <tr>
-    <td align="center" width="180"><img src="assets/clawd-idle.svg" width="96" /></td>
-    <td align="center" width="180"><img src="assets/clawd-active.svg" width="96" /></td>
-    <td align="center" width="180"><img src="assets/clawd-idle-alert.svg" width="96" /></td>
-    <td align="center" width="180"><img src="assets/clawd-happy.svg" width="96" /></td>
-  </tr>
-  <tr>
-    <td align="center"><b>idle</b><br/><sub>calm · 4s breathing pulse</sub></td>
-    <td align="center"><b>active</b><br/><sub>chat open · arms up · ! badge</sub></td>
-    <td align="center"><b>idle-alert</b><br/><sub>30 min idle · ascending zzz</sub></td>
-    <td align="center"><b>happy</b><br/><sub>all todos done · star burst</sub></td>
-  </tr>
+<table>
+<thead>
+<tr>
+<th align="center" width="25%">idle</th>
+<th align="center" width="25%">active</th>
+<th align="center" width="25%">idle-alert</th>
+<th align="center" width="25%">happy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><img src="assets/clawd-idle.svg" width="120" alt="Clawd idle"/></td>
+<td align="center"><img src="assets/clawd-active.svg" width="120" alt="Clawd active"/></td>
+<td align="center"><img src="assets/clawd-idle-alert.svg" width="120" alt="Clawd idle-alert"/></td>
+<td align="center"><img src="assets/clawd-happy.svg" width="120" alt="Clawd happy"/></td>
+</tr>
+<tr>
+<td align="center"><sub><b>at rest</b></sub></td>
+<td align="center"><sub><b>listening</b></sub></td>
+<td align="center"><sub><b>dozing</b></sub></td>
+<td align="center"><sub><b>celebrating</b></sub></td>
+</tr>
+<tr>
+<td><sub>Neutral eyes, three stubby legs, slow 4-second breathing pulse. Calm and present without asking for attention.</sub></td>
+<td><sub>Chat is open. Arms raised, an alert badge above the head, eye-shine pixels. Engaged and ready.</sub></td>
+<td><sub>You've been away 30 minutes. Half-lid eyes, drooped arms, ascending zzz, faster 1.5s pulse, slightly desaturated. Sleepy, not sad.</sub></td>
+<td><sub>Today's todos are done. Arc-smile, blush cheeks, asymmetric mid-skip legs, scattered yellow stars, spring-bounce.</sub></td>
+</tr>
+</tbody>
 </table>
 
-Pure pixel art — every shape is an axis-aligned rect on a 4 px grid. The four states are switched by a small state machine in the main process and animated in the renderer with Framer Motion. Right-click for the context menu, scroll to resize, drag to reposition with edge-snapping.
+#### Palette
 
----
+| token | hex | role |
+|---|---|---|
+| `clawd-idle` | `#D4622A` | default body |
+| `clawd-active` | `#E06820` | engaged body |
+| `clawd-alert` | `#C45A25` | desaturated, dozing |
+| `clawd-happy` | `#E87030` | celebratory body |
+| `accent-yellow` | `#F5C542` | badge, stars |
+| `eye` | `#1a1208` | pupil, lineart |
+| `cheek` | `#F0956A` | blush |
 
-## Why
-
-LLM chat windows are great when you remember to open them, and forgotten the rest of the day. pocket-clawd flips that: the assistant lives next to your work, asks you one focused question at the hour that matters, and quietly saves a structured record of what you said.
-
-| Hour | Slot | Default opener |
-|---:|---|---|
-| 04:00 | Brahma Muhurta | sadhana / morning intention |
-| 06:30 | Morning | priorities for the day |
-| 09:00 | Work | current task, blockers, progress |
-| 18:00 | Evening | wind-down / reflection |
-| 21:00 | Night | what was accomplished, what carries forward |
-
-The persona Claude adopts is yours to shape — fully editable in Settings.
-
----
-
-## What you get
-
-- **Floating Clawd avatar** — bottom-right corner by default. Always-on-top across spaces and fullscreen apps. Drag to reposition (snaps to any screen edge). Scroll to resize (40–120 px). Position and size persist across launches.
-- **Streaming chat panel** — springs open from the avatar's corner with a 380 × 520 frameless window. Streaming responses via the official Anthropic SDK. Type `done` to end the session and save it.
-- **Time-aware system prompt** — built per-request from the current time slot, your editable persona, and a snapshot of today's todos.
-- **Daily todo list** — separate floating panel. Live progress ring around the avatar updates on every check / uncheck. When you complete the last todo, the avatar bursts into the **happy** state.
-- **Whisper engine** — randomized 8–12 minute lightweight Claude calls (`max_tokens: 30`) generate context-aware nudges that fade in as a tooltip over the avatar. Cached for 24 hours so you don't see the same whisper twice.
-- **Idle alert** — `powerMonitor.getSystemIdleTime()` is polled every 30 s; after the configured threshold the avatar shifts to `idle-alert` and (if enabled) surfaces an immediate whisper.
-- **Session output** — every session saves to `~/Documents/claude-sessions/YYYY-MM-DD_HH-MM.spec.md` with YAML frontmatter, a Claude-generated summary, key points, next actions, and the full transcript.
-- **Daily todo archive** — at midnight, completed todos archive as JSON + markdown summary; incomplete todos surface as a "carry over from yesterday?" prompt at the start of the next day's first chat session.
-- **Macros for the menubar** — global hotkey (default `⌘⇧C`), tray icon, "View last session" → opens the most recent `.spec.md` in your default editor.
+Source SVGs live in `assets/clawd-{idle,active,idle-alert,happy}.svg` and import as inline React components, so they animate from CSS and Framer Motion variants.
 
 ---
 
 ## Quick start
 
-> **Requires:** macOS 13+, Node.js 20+, an Anthropic API key.
-
 ```bash
 git clone https://github.com/rahulkarda/pocket-clawd.git
 cd pocket-clawd
 npm install
-npm run build:icons    # rasterizes the tray template SVG to PNG (needs sharp)
+npm run build:icons
 npm run dev
 ```
 
-On first launch the Settings window opens automatically. Paste your Anthropic API key (it's stored in macOS Keychain — never in plaintext on disk), pick a model, and close the window. The tray icon and floating Clawd appear immediately.
+First launch will ask for your Anthropic API key. It goes into the macOS Keychain.
 
-### Optional: skip the Settings UI on first launch
-
-If you'd rather seed credentials from environment variables before the first `npm run dev`:
+Optional — pre-seed the keychain so the first launch is silent:
 
 ```bash
 ANTHROPIC_API_KEY=sk-ant-... node scripts/seed-credentials.cjs
 ```
 
-This writes the key to Keychain and marks `onboarded: true` in the settings file.
+Build a distributable `.app`:
 
-### Optional: route through a custom proxy
+```bash
+npm run package
+# → dist/mac-arm64/Pocket Clawd.app
+```
 
-If your org routes Anthropic API calls through an internal gateway, paste the gateway URL in **Settings → API Base URL**. The SDK appends `/v1/...` to whatever you set. Empty means use `api.anthropic.com` directly.
+> macOS 13+. Code signing is roadmap, so first launch needs the right-click → Open dance.
 
 ---
 
 ## Architecture
 
-```text
-Main process (Electron + Node)                Renderer processes (React + Tailwind)
-┌─────────────────────────────┐              ┌──────────────────────────────────┐
-│  Tray ─────────────────┐    │              │  Avatar window (always-on-top)   │
-│  Avatar window (panel) │    │   IPC        │   - Clawd state machine          │
-│  Chat window (panel)   │ ◄──┼──preload────►│   - Progress ring                │
-│  Todo window (panel)   │    │              │   - Whisper tooltip              │
-│  Settings window       │    │              ├──────────────────────────────────┤
-│                        │    │              │  Chat window                     │
-│  Anthropic SDK ────────┤    │              │   - Streaming UI                 │
-│   - streaming chat     │    │              │   - Carry-forward prompt         │
-│   - one-shot whisper   │    │              ├──────────────────────────────────┤
-│                        │    │              │  Todo window  ·  Settings window │
-│  Keychain (keytar)     │    │              └──────────────────────────────────┘
-│  electron-store        │
-│   - settings           │
-│   - todos              │
-│   - whisper cache      │
-│  idleTracker           │
-│  whisperEngine         │
-│  specWriter            │
-└─────────────────────────────┘
+Electron 32, electron-vite, React 18, TypeScript strict, Tailwind 3, Framer Motion 11. Four renderer processes (avatar, chat, todo, settings) talk to a single main process through a typed `contextBridge`. The Anthropic SDK lives only in main — renderers never see the key, never see the wire.
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                            MAIN PROCESS                              │
+│                                                                      │
+│  ┌─────────┐  ┌───────────────┐  ┌──────────────┐  ┌─────────────┐   │
+│  │  Tray   │  │  IPC handlers │  │  Keychain    │  │ electron-   │   │
+│  │  Menu   │  │  (typed)      │  │  (keytar)    │  │  store      │   │
+│  └─────────┘  └───────┬───────┘  └──────────────┘  └─────────────┘   │
+│                       │                                              │
+│            ┌──────────▼──────────┐                                   │
+│            │  anthropicClient.ts │  ◄── system prompt rebuilt every  │
+│            │   (agentic loop)    │      request: time + persona +    │
+│            └──────────┬──────────┘      todos + memory protocol      │
+│                       │                                              │
+│       while !end_turn (max 10 turns):                                │
+│         stream → forward text deltas to chat renderer                │
+│         if stop_reason === 'tool_use':                               │
+│            ├── name === 'memory'  ──►  runMemory()  ──► memory.ts    │
+│            └── otherwise           ──►  runTool()    ──► tools.ts    │
+│         push tool_result as next user message                        │
+│                                                                      │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │
+│  │ idleTracker │  │whisperEngine│  │  todoStore  │  │ specWriter  │  │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  │
+│                                                                      │
+│   memory backend ──► ~/Documents/clawd-memory/  (path-guarded fs)    │
+└──────────────────────────────┬───────────────────────────────────────┘
+                               │
+            ┌──────────────────┼──────────────────┐
+            │  contextBridge → window.api (typed) │
+            │  contextIsolation · CSP · no node   │
+            │  integration · no raw ipcRenderer   │
+            └──────────────────┼──────────────────┘
+                               │
+   ┌───────────────┬───────────┼────────────┬─────────────────┐
+   │               │           │            │                 │
+┌──▼───────┐  ┌────▼─────┐  ┌──▼──────┐  ┌──▼──────────┐
+│ AVATAR   │  │  CHAT    │  │  TODO   │  │  SETTINGS   │
+│ panel    │  │ 380x520  │  │  panel  │  │  panel      │
+│ drag/    │  │ frameless│  │ ring +  │  │ key, model, │
+│ snap/    │  │ stream   │  │ rollover│  │ persona,    │
+│ resize   │  │ (deltas) │  │         │  │ memory,     │
+│          │  │          │  │         │  │ login item  │
+└──────────┘  └──────────┘  └─────────┘  └─────────────┘
 ```
 
-### File layout
+The agentic loop is the spine: stream tokens out, dispatch tool calls, feed results back, repeat until `end_turn` or the 10-turn ceiling. Memory and custom tool calls share the loop but split at dispatch — memory has its own backend with stricter validation.
 
-```text
-src/
-├── main/                       Electron main process
-│   ├── index.ts                Entry · bootstrap · single-instance lock
-│   ├── tray.ts                 Menubar tray + right-click menu
-│   ├── avatarWindow.ts         Floating panel · drag-to-snap
-│   ├── chatWindow.ts           Frameless chat panel
-│   ├── secondaryWindows.ts     Todo + Settings windows
-│   ├── avatarMenu.ts           Avatar right-click menu
-│   ├── hotkey.ts               Global shortcut registration
-│   ├── idleTracker.ts          powerMonitor poll → 'idle-alert' / 'active'
-│   ├── todoStore.ts            Daily todos · midnight rollover · archive
-│   ├── specWriter.ts           Extract <SPEC_READY> · write .spec.md
-│   ├── whisperEngine.ts        Background ambient nudges · 24h dedup cache
-│   ├── anthropicClient.ts      SDK streaming · system prompt builder
-│   ├── keychain.ts             keytar wrapper
-│   ├── settings.ts             electron-store
-│   ├── ipcHandlers.ts          Centralized IPC + input sanitization
-│   └── logger.ts
-├── preload/
-│   ├── index.ts                Typed contextBridge → window.api
-│   └── global.d.ts
-├── renderer/
-│   ├── *.html / *.tsx          Four entries: avatar · chat · todo · settings
-│   ├── apps/                   One App component per window
-│   ├── components/             Clawd · ProgressRing · Header · Message · …
-│   ├── lib/                    Renderer helpers (stripSpec, etc.)
-│   └── global.d.ts             Renderer-side window.api type augmentation
-└── shared/
-    ├── types.ts                Cross-process types
-    ├── ipc.ts                  Channel name constants
-    └── time.ts                 Time-slot mapper · date keys
+The shape, abbreviated (see `src/main/anthropicClient.ts` for the real thing):
 
-assets/
-├── clawd-idle.svg              neutral · breathing
-├── clawd-active.svg            chat open · arms up · ! badge
-├── clawd-idle-alert.svg        squinted · drooped arms · zzz
-├── clawd-happy.svg             todos done · star burst
-└── tray-iconTemplate.svg       Menubar template (auto-rasterized)
+```typescript
+let messages: Anthropic.MessageParam[] = [{ role: "user", content: userInput }];
+
+for (let turn = 0; turn < 10; turn++) {
+  const stream = client.messages.stream({
+    model: settings.model,        // claude-sonnet-4-6 default
+    max_tokens: 4096,
+    system: buildSystemPrompt(),  // rebuilt every request
+    tools: allTools,
+    messages,
+  });
+
+  stream.on("text", (delta) => chatWindow.webContents.send("chat:delta", delta));
+  const response = await stream.finalMessage();
+  messages.push({ role: "assistant", content: response.content });
+
+  if (response.stop_reason === "end_turn") break;
+
+  if (response.stop_reason === "tool_use") {
+    const results: Anthropic.ToolResultBlockParam[] = [];
+    for (const tu of response.content.filter(b => b.type === "tool_use")) {
+      const out = tu.name === "memory"
+        ? await runMemory(tu.input)        // memory.ts — fs ops + guard
+        : await runTool(tu.name, tu.input); // tools.ts — todo CRUD + grep
+      results.push({ type: "tool_result", tool_use_id: tu.id, content: out });
+    }
+    messages.push({ role: "user", content: results });
+    continue;
+  }
+
+  break; // pause_turn, refusal, max_tokens, etc.
+}
 ```
 
-### How chat works
+Text deltas forward to the renderer in real time; tool calls and their results don't, so the panel feels like a chat instead of a debugger.
 
-1. The user sends a message; the renderer pushes the full `ChatMessage[]` history over IPC to the main process.
-2. `anthropicClient.ts` builds a fresh system prompt at request time from: current time + slot label, the editable persona from settings, a snapshot of today's todos, and instructions to end the session by emitting `<SPEC_READY>...</SPEC_READY>` when the user types `done`.
-3. The main process opens an SDK stream and forwards each text delta back to the chat renderer over IPC for token-by-token display.
-4. When the stream completes, main scans the accumulated text for `<SPEC_READY>...</SPEC_READY>`. If present, the block is written to `~/Documents/claude-sessions/<date>_<time>.spec.md` together with the formatted transcript.
+---
 
-> **Note on stop sequences:** Anthropic's `stop_sequences` parameter would terminate generation right at the opening tag, so the body would never be returned. Instead, pocket-clawd lets the response complete naturally and parses the closing tag once the stream ends. This keeps streaming UX intact.
+## Tools
+
+Seven capabilities at the table — five local, one Anthropic-hosted, one local-backed memory tool dispatched through Anthropic's `memory_20250818`.
+
+| tool | kind | what it does |
+|---|---|---|
+| `add_todo(text)` | local | Adds a todo. Length-capped at 500 chars. |
+| `complete_todo(id_or_text)` | local | Fuzzy substring match — say it like a human, get it checked off. |
+| `delete_todo(id_or_text)` | local | Same fuzzy resolver, removes the entry. |
+| `list_todos()` | local | Returns `id` / `text` / `done` JSON for the agent to reason over. |
+| `search_past_sessions(query, limit?)` | local | Greps `*.spec.md` in the sessions dir, up to 20 hits with date / time / snippet. |
+| `web_search_20260209` | server (Anthropic) | Current events and post-cutoff facts. Capped at 5 uses per turn. |
+| `memory_20250818` | server-typed, local-backed | Persistent file-backed memory. Six commands. See below. |
+
+Tools are always-on. You never leave the chat panel to manage your day — tell Clawd "knock out the design review todo and add one for the regression sweep" and the panel stays a conversation.
+
+> `web_fetch` is referenced in the system prompt but is **not** registered as a tool today. Honest disclosure rather than aspirational marketing.
+
+---
+
+## Memory
+
+Clawd uses Anthropic's `memory_20250818` tool, backed by `~/Documents/clawd-memory/`. The power lives in the file system; the design choice lives in the *protocol*.
+
+#### Layout
+
+Clawd self-organizes the store. The conventional shape:
+
+```
+~/Documents/clawd-memory/memories/
+├── about_user.md          # durable facts: name, role, projects
+├── recent_topics.md       # last 2-3 weeks of recurring threads
+└── notes/
+    ├── auth-flow.md       # deeper per-topic notes
+    └── design-system.md
+```
+
+Six commands available to the model: `view` · `create` · `str_replace` · `insert` · `delete` · `rename`.
+
+#### Protocol (baked into the system prompt)
+
+- **First turn of a session:** view `/memories`, read `about_user.md` if present.
+- **During the conversation:** write durable facts inline — preferences, corrections, recurring practices, project names.
+- **Never store:** secrets, "forget this" content, ephemeral state (mood, lunch, what time the meeting was).
+- **Don't paste memory back verbatim.** Weave it naturally — the user shouldn't feel surveilled. If yesterday you said you were stuck on the auth flow, today's greeting is "morning — still on auth, or moving on?" not "I remember you said yesterday at 3:42pm…"
+- **On `done`:** write any new durable facts before emitting `<SPEC_READY>`.
+
+#### Guard rails
+
+- Paths must start with `/memories`. No `..`, no absolute paths, no symlink escapes — rejected with an explicit error.
+- Per-file cap: **100 KB**. Per-store cap: **10 MB**.
+- All writes go through validation in `memory.ts` before they touch the disk.
+
+#### Inspect or clear
+
+- **Settings → Open memory folder** opens Finder at the directory. The folder is plain markdown — read it, edit it, version it.
+- **Settings → Clear memory** wipes the store with a confirmation dialog.
+
+---
+
+## Features
+
+#### Floating avatar
+
+A `BrowserWindow` of `type: 'panel'` with `transparent: true`, `backgroundColor: '#00000000'`, `hasShadow: false`, `alwaysOnTop: true`. Floats over fullscreen apps and across spaces.
+
+- **Drag anywhere** — JS-driven `mousedown`/`move`/`up` with a 5px click-vs-drag threshold. Under 5px = click → opens chat; over 5px = drag → moves the window. The previous `-webkit-app-region: drag` approach couldn't do arbitrary-position drags on macOS panels. This one can.
+- **Edge snap** — within 20px of any work-area edge, snaps with a 16px margin.
+- **Scroll to resize** — 40-120px, persisted across launches.
+- **Position persists.** Right-click for the context menu.
+- **Cannot be closed via ⌘W** — that would orphan the app. Only **Quit Clawd** (tray menu / ⌘Q) actually exits.
+
+#### Streaming chat
+
+380×520 frameless panel, springs from the avatar's nearest corner via Framer Motion. Streams tokens as they arrive from `@anthropic-ai/sdk`. The system prompt is rebuilt every request from current time slot, persona, todos snapshot, memory protocol, and `<SPEC_READY>` emission rules.
+
+Type `done` to wrap up — Clawd writes a `<SPEC_READY>` block, the main process parses it out, and a structured `.spec.md` lands on disk. Default model: `claude-sonnet-4-6`. Switchable to `claude-opus-4-8` or `claude-haiku-4-5` from settings.
+
+#### Daily todos with progress ring
+
+A separate floating panel — add, check, delete. The avatar's surrounding ring tracks completion. At 100% the ring turns green and Clawd bursts into the **happy** state with the spring-bounce. At midnight, completed todos archive to JSON+md and incomplete ones become a `carry over from yesterday?` prompt at the start of the next chat.
+
+#### Whisper engine
+
+Every 8-12 minutes (randomized) Clawd makes a lightweight call (`max_tokens: 30`) and produces a context-aware nudge as a fading tooltip over the avatar. A 24-hour dedup cache keeps the same whisper from repeating. Time-aware, persona-aware, and gated on the idle-alert state if you opt in.
+
+#### Idle alert
+
+`powerMonitor.getSystemIdleTime()` polled every 30 seconds. After threshold (default 30 min, configurable 15/30/45/60/90/120) the avatar swaps to **idle-alert** and optionally fires a whisper.
+
+#### Sessions as structured markdown
+
+On `done`:
+
+```yaml
+---
+date: 2026-06-15
+time: 14:32
+slot: afternoon
+duration_min: 47
+topics: [auth-flow, design-system]
+mood: focused
+energy: medium
+---
+```
+
+…followed by a 150-word Claude-generated summary, **Key Points**, **Next Actions**, and the raw transcript. Saved to `~/Documents/claude-sessions/<date>_<time>.spec.md`. **View last session** in the tray menu opens the latest file.
+
+#### Auto-launch at login
+
+Settings → `Open at login` calls `app.setLoginItemSettings()`. macOS rejects this for unsigned apps, so the toggle shows an honest *"macOS needs your help"* banner with a one-click deep-link to **System Settings → Login Items**. No silent failure. Once code signing lands, the dance goes away.
 
 ---
 
 ## Defaults
 
-| Setting | Default | Editable |
-|---|---|---|
-| Hotkey | `⌘⇧C` | yes |
-| Model | `claude-sonnet-4-6` | yes (Opus 4.8 / Haiku 4.5 also available) |
-| Output dir | `~/Documents/claude-sessions/` | yes |
-| Avatar size | 64 px | yes (40–120, slider + scroll-resize) |
-| Avatar position | bottom-right | drag anywhere; persists |
-| Whisper interval | 8–12 minutes (randomized) | yes |
-| Idle alert | after 30 minutes | yes (15 / 30 / 45 / 60 / 90 / 120) |
-| Whisper on idle alert | on | toggle |
-| Show on all spaces | on | toggle (incl. fullscreen) |
-| Persona | generic placeholder | edit in Settings to personalize |
+| setting | default |
+|---|---|
+| hotkey | ⌘⇧C |
+| model | `claude-sonnet-4-6` (switchable to `opus-4-8` / `haiku-4-5`) |
+| sessions dir | `~/Documents/claude-sessions/` |
+| memory dir | `~/Documents/clawd-memory/` |
+| avatar size | 64px (40-120 via scroll/slider) |
+| avatar position | bottom-right, drag anywhere |
+| whisper interval | 8-12 min, randomized |
+| idle alert | 30 min (15 / 30 / 45 / 60 / 90 / 120) |
+| web search | on (Anthropic-hosted, billed per use) |
+| memory | on |
+| open at login | off |
 
 ---
 
-## Security & data
+## Stack
 
-- **API key storage:** macOS Keychain via `keytar`. Never on disk in plaintext.
-- **Renderer surface:** preload exposes `setApiKey`, `clearApiKey`, `apiKeyPresent` (boolean) — there is **no IPC channel that returns the key value to a renderer**.
-- **Renderer hardening:** every window has `contextIsolation: true`, `nodeIntegration: false`. CSPs limit `connect-src` so renderers can't make their own outbound HTTP. The SDK is called from main, not the renderer.
-- **Input sanitization:** all settings updates are length-clamped and numerically validated server-side in the main process to prevent NaN propagation, oversized fields, etc.
-- **Session output:** transcripts and todo archives stay on your disk — nothing is uploaded anywhere except the Anthropic API call itself.
+| layer | choice |
+|---|---|
+| shell | Electron 32 + electron-vite |
+| ui | React 18 + TypeScript strict |
+| style | Tailwind 3 |
+| motion | Framer Motion 11 |
+| llm | `@anthropic-ai/sdk` 0.104.1 |
+| keychain | `keytar` 7.9 |
+| storage | `electron-store` 8.2 |
+| ids | `nanoid` 3.3 (CJS-compatible) |
 
 ---
 
-## Build
+## Security
 
-```bash
-npm run typecheck     # tsc --noEmit on both node + web tsconfigs
-npm run build         # bundle main + preload + renderer
-npm run package       # mac dmg, unsigned   (output in dist/)
-npm run dist          # full electron-builder dist
-```
-
-Unsigned builds open with a Gatekeeper warning on first launch (`right-click → Open` once to bypass). Adding a Developer ID for code signing is on the roadmap.
+- **API key in macOS Keychain only**, via `keytar`. Verified with the `security` CLI and a leak scan over the dist bundle. The renderer surface exposes `setApiKey`, `clearApiKey`, and `apiKeyPresent` — no `getApiKey`. The SDK is instantiated in main; the key never crosses the IPC boundary.
+- **All IPC inputs sanitized.** Strings length-clamped, numbers `NaN`-guarded, booleans coerced.
+- **Memory tool guard rails.** Path-traversal blocked, per-file 100KB and per-store 10MB caps, no symlink escape, explicit errors on any escape attempt.
+- **CSP on every renderer.** `contextIsolation: true`, `nodeIntegration: false`, no inline scripts, no `eval`, no remote loads.
+- **Avatar window uncloseable via ⌘W** — only **Quit Clawd** ends the app. Avoids the "I closed the window and now the app is a ghost in the tray" failure mode.
 
 ---
 
 ## Roadmap
 
-- [ ] Code signing (Apple Developer ID) and notarization
-- [ ] Light theme toggle
+Honest accounting of what is **not** in 0.4.0:
+
+- [ ] Code signing + notarization (so "open at login" works without the System Settings dance)
+- [ ] Light theme
 - [ ] Resume an interrupted session
 - [ ] Custom mascot upload
 - [ ] Windows + Linux ports
-- [ ] Optional voice input via the OS speech framework
+- [ ] Voice input
+- [ ] Image input
+
+Open an issue if you want any of these.
+
+---
+
+## Changelog
+
+<details>
+<summary><b>0.4.0</b> — current</summary>
+
+- Renamed `pocket-claude` → `pocket-clawd`
+- Anthropic SDK upgraded `0.30` → `0.104.1`
+- Agentic loop with tool use (max 10 turns, streaming preserved)
+- Five custom tools: todo CRUD + past-session search
+- `web_search` server tool registered (Anthropic-hosted)
+- Persistent memory (`memory_20250818`) with local fs backend, guard rails, size caps
+- Memory protocol baked into the system prompt
+- Avatar drag-anywhere via JS (the old `-webkit-app-region: drag` couldn't do arbitrary positions on macOS panels)
+- Avatar fully transparent — no white square behind the SVG
+- Avatar uncloseable except via explicit Quit
+- "Open at login" toggle with honest unsigned-app banner
+- UI rename Claude → Clawd in tray, chat header, and context menus
+
+</details>
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT © [rahulkarda](https://github.com/rahulkarda). See [LICENSE](LICENSE).
 
----
-
-<div align="center">
-<sub>Built on top of <a href="https://github.com/anthropics/anthropic-sdk-typescript">@anthropic-ai/sdk</a>, <a href="https://www.electronjs.org/">Electron</a>, and a lot of pixel art.</sub>
-</div>
+<div align="center"><sub>drawn on a 4px grid</sub></div>
