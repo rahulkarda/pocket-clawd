@@ -8,6 +8,8 @@ export const IPC = {
   SETTINGS_SET_API_KEY: 'settings:apiKey:set',
   SETTINGS_CLEAR_API_KEY: 'settings:apiKey:clear',
   SETTINGS_PICK_OUTPUT_DIR: 'settings:outputDir:pick',
+  SETTINGS_LOGIN_ITEM_STATUS: 'settings:loginItem:status',
+  SETTINGS_OPEN_LOGIN_ITEMS_PANE: 'settings:loginItem:openPane',
 
   // ─── Window control ─────────────────────────────────
   CHAT_OPEN: 'chat:open',

@@ -23,7 +23,11 @@ const api = {
     apiKeyPresent: (): Promise<boolean> => ipcRenderer.invoke(IPC.SETTINGS_GET_API_KEY_PRESENT),
     setApiKey: (key: string): Promise<boolean> => ipcRenderer.invoke(IPC.SETTINGS_SET_API_KEY, key),
     clearApiKey: (): Promise<boolean> => ipcRenderer.invoke(IPC.SETTINGS_CLEAR_API_KEY),
-    pickOutputDir: (): Promise<string | null> => ipcRenderer.invoke(IPC.SETTINGS_PICK_OUTPUT_DIR)
+    pickOutputDir: (): Promise<string | null> => ipcRenderer.invoke(IPC.SETTINGS_PICK_OUTPUT_DIR),
+    loginItemStatus: (): Promise<{ wanted: boolean; actual: boolean; mismatch: boolean }> =>
+      ipcRenderer.invoke(IPC.SETTINGS_LOGIN_ITEM_STATUS),
+    openLoginItemsPane: (): Promise<void> =>
+      ipcRenderer.invoke(IPC.SETTINGS_OPEN_LOGIN_ITEMS_PANE)
   },
 
   // ─── Windows ────────────────────────────────────────

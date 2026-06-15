@@ -2,7 +2,7 @@
  * Centralized IPC registration. All main-side handlers live here so the
  * surface area is auditable in one file.
  */
-import { ipcMain, BrowserWindow, dialog, app } from 'electron'
+import { ipcMain, BrowserWindow, dialog, app, shell } from 'electron'
 import { IPC } from '@shared/ipc'
 import logger from './logger'
 import * as keychain from './keychain'
@@ -93,6 +93,13 @@ export function registerIpc(actions: AppActions): void {
     if (clean.baseURL !== undefined && clean.baseURL !== prev.baseURL) {
       resetClient()
     }
+    if (clean.openAtLogin !== undefined && clean.openAtLogin !== prev.openAtLogin) {
+      // Tell macOS to add/remove this app from the user's Login Items.
+      app.setLoginItemSettings({
+        openAtLogin: next.openAtLogin,
+        openAsHidden: false
+      })
+    }
     return next
   })
 
@@ -116,6 +123,23 @@ export function registerIpc(actions: AppActions): void {
     if (result.canceled || !result.filePaths[0]) return null
     settingsStore().update({ outputDir: result.filePaths[0] })
     return result.filePaths[0]
+  })
+
+  /**
+   * Returns the actual macOS Login Item state vs what the user wants.
+   * Unsigned apps cannot register themselves via setLoginItemSettings —
+   * macOS silently rejects the call, so we read back the truth and let
+   * the renderer show an honest banner if the two disagree.
+   */
+  ipcMain.handle(IPC.SETTINGS_LOGIN_ITEM_STATUS, () => {
+    const wanted = settingsStore().get().openAtLogin
+    const actual = app.getLoginItemSettings().openAtLogin
+    return { wanted, actual, mismatch: wanted !== actual }
+  })
+
+  ipcMain.handle(IPC.SETTINGS_OPEN_LOGIN_ITEMS_PANE, async () => {
+    // macOS deep link straight to the Login Items pane.
+    await shell.openExternal('x-apple.systempreferences:com.apple.LoginItems-Settings.extension')
   })
 
   // ─── Window control ─────────────────────────────────

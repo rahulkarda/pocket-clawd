@@ -63,6 +63,8 @@ export interface AppSettings {
   userContext: string
   whisperOnIdleAlert: boolean
   showOnAllSpaces: boolean
+  /** Launch the app on macOS login. Toggled via Settings UI. */
+  openAtLogin: boolean
   /** First-run completion gate */
   onboarded: boolean
 }
@@ -81,6 +83,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     'You are talking to a software developer. Keep check-ins short and focused. Adapt your tone to the time of day. (Edit this in Settings to personalize.)',
   whisperOnIdleAlert: true,
   showOnAllSpaces: true,
+  openAtLogin: false,
   onboarded: false
 }
 

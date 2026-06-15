@@ -13,10 +13,25 @@ export function SettingsApp(): JSX.Element {
   const [keyPresent, setKeyPresent] = useState(false)
   const [savingKey, setSavingKey] = useState(false)
   const [savedFlash, setSavedFlash] = useState<string | null>(null)
+  const [loginItemMismatch, setLoginItemMismatch] = useState(false)
+
+  // Compare what the user wants (settings.openAtLogin) with what macOS
+  // actually has registered. Unsigned apps fail setLoginItemSettings
+  // silently — this surfaces the gap so the user knows to register
+  // manually via System Settings.
+  const refreshLoginItem = async (): Promise<void> => {
+    try {
+      const status = await window.api.settings.loginItemStatus()
+      setLoginItemMismatch(status.mismatch)
+    } catch {
+      setLoginItemMismatch(false)
+    }
+  }
 
   useEffect(() => {
     void window.api.settings.get().then(setSettings)
     void window.api.settings.apiKeyPresent().then(setKeyPresent)
+    void refreshLoginItem()
   }, [])
 
   const flash = (msg: string): void => {
@@ -27,6 +42,10 @@ export function SettingsApp(): JSX.Element {
   const update = async (patch: Partial<AppSettings>): Promise<void> => {
     const next = await window.api.settings.update(patch)
     setSettings(next)
+    if (patch.openAtLogin !== undefined) {
+      // Re-check after a short delay — macOS sometimes takes a moment to register
+      window.setTimeout(() => void refreshLoginItem(), 250)
+    }
     flash('Saved')
   }
 
@@ -216,6 +235,26 @@ export function SettingsApp(): JSX.Element {
         </Section>
 
         <Section title="Behavior">
+          <Toggle
+            label="Open at login"
+            value={settings.openAtLogin}
+            onChange={(v) => update({ openAtLogin: v })}
+          />
+          {loginItemMismatch && settings.openAtLogin && (
+            <div className="mt-1 mb-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-200/90 leading-relaxed">
+              <span className="font-medium">macOS needs your help.</span>{' '}
+              Unsigned apps can't add themselves to Login Items, so the toggle
+              above is informational only. Add Pocket Claude manually:
+              <button
+                onClick={() => void window.api.settings.openLoginItemsPane()}
+                className="ml-1 underline decoration-dotted hover:text-amber-100"
+              >
+                open System Settings → Login Items
+              </button>{' '}
+              then click <span className="font-mono">+</span> and choose{' '}
+              <span className="font-mono">/Applications/Pocket&nbsp;Claude.app</span>.
+            </div>
+          )}
           <Toggle
             label="Surface a whisper when going idle"
             value={settings.whisperOnIdleAlert}

@@ -24,6 +24,8 @@ declare global {
         setApiKey: (key: string) => Promise<boolean>
         clearApiKey: () => Promise<boolean>
         pickOutputDir: () => Promise<string | null>
+        loginItemStatus: () => Promise<{ wanted: boolean; actual: boolean; mismatch: boolean }>
+        openLoginItemsPane: () => Promise<void>
       }
       chat: {
         open: () => Promise<void>
