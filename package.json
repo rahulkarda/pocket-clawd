@@ -40,7 +40,7 @@
     "lint": "eslint . --ext .ts,.tsx"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.30.0",
+    "@anthropic-ai/sdk": "^0.104.1",
     "electron-store": "^8.2.0",
     "framer-motion": "^11.11.0",
     "keytar": "^7.9.0",

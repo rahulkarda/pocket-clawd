@@ -65,6 +65,10 @@ export interface AppSettings {
   showOnAllSpaces: boolean
   /** Launch the app on macOS login. Toggled via Settings UI. */
   openAtLogin: boolean
+  /** Enable Anthropic-hosted web_search tool. Server-side; uses extra tokens. */
+  enableWebSearch: boolean
+  /** Enable persistent memory tool (~/Documents/clawd-memory/). */
+  enableMemory: boolean
   /** First-run completion gate */
   onboarded: boolean
 }
@@ -84,6 +88,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   whisperOnIdleAlert: true,
   showOnAllSpaces: true,
   openAtLogin: false,
+  enableWebSearch: true,
+  enableMemory: true,
   onboarded: false
 }
 

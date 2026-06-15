@@ -1,11 +1,22 @@
 /**
  * Anthropic streaming chat client + system prompt builder.
  *
- * Stop sequence strategy:
- *   We instruct Claude to emit "<SPEC_READY>...</SPEC_READY>" on session-end.
- *   The Anthropic API supports `stop_sequences`, but we don't use it for the OPENING
- *   tag — we want the full block. Instead the orchestrator detects </SPEC_READY> in
- *   the accumulated stream and parses the content. This keeps streaming UX intact.
+ * AGENTIC LOOP:
+ *   We support tool use (custom todo tools, search_past_sessions, plus
+ *   Anthropic-hosted web_search and web_fetch). One "send" from the
+ *   renderer can produce multiple Claude turns under the hood:
+ *
+ *     stream → if stop_reason==='tool_use' → run tools → feed back → stream again
+ *
+ *   We stop when stop_reason==='end_turn'. A safety cap of 10 turns
+ *   prevents runaway loops. Text deltas from every stream are forwarded to
+ *   the renderer continuously, so the user sees Claude "thinking" between
+ *   tool calls naturally.
+ *
+ * SPEC_READY: Claude is instructed to emit "<SPEC_READY>...</SPEC_READY>"
+ *   on session-end. We don't use stop_sequences (would cut at opening tag);
+ *   the orchestrator detects the closing tag in the accumulated stream and
+ *   parses the content out for writing to disk.
  */
 import Anthropic from '@anthropic-ai/sdk'
 import logger from './logger'
@@ -13,6 +24,7 @@ import { getApiKey } from './keychain'
 import { settingsStore } from './settings'
 import { getDaily } from './todoStore'
 import { getTimeSlot, timeSlotLabel } from '@shared/time'
+import { runTool, TOOLS } from './tools'
 import type { ChatMessage, TimeSlot } from '@shared/types'
 
 const SYSTEM_TEMPLATE = (
@@ -20,8 +32,7 @@ const SYSTEM_TEMPLATE = (
   nowHHMM: string,
   userContext: string,
   todoBlock: string
-): string => `You are a concise, warm assistant living in a macOS tray widget.
-Your job is to check in with the user through short, focused questions.
+): string => `You are Clawd — a concise, warm companion living in a macOS tray widget. You check in with the user through short, focused questions, help them stay on top of their day, and have access to tools.
 
 TIME CONTEXT: ${nowHHMM}, ${timeSlotLabel(slot)}
 USER CONTEXT: ${userContext}
@@ -36,7 +47,12 @@ Based on the time of day, adapt your opening question:
 - Night (9:00pm+): Ask about what was accomplished, what to carry forward
 
 Keep questions SHORT (1–2 sentences). Never ask more than one question at a time.
-Reference the user's todos naturally if relevant — don't list them robotically.
+
+TOOLS:
+You have access to tools. Use them when natural — don't ask permission, just act:
+- add_todo / complete_todo / delete_todo / list_todos: when the user mentions tasks they want to track or finish, manage their list silently. Acknowledge with a single short line ("added", "got it, marked done") — don't recite the whole list back.
+- search_past_sessions: when the user references something they said earlier ("last week we talked about", "remind me what I said about X").
+- web_search / web_fetch: for current events, facts past your training cutoff, or content at a specific URL.
 
 When the user types "done" (case-insensitive), thank them briefly (1 sentence), then output ONLY:
 
@@ -116,9 +132,37 @@ export interface StreamCallbacks {
   onError: (msg: string) => void
 }
 
+const MAX_TURNS = 10
+
+type AnyMessageParam = Anthropic.MessageParam
+
 /**
- * Send the full conversation history and stream the response.
- * Uses `messages.stream()` helper — gives us text_stream + final message.
+ * Build the tools array based on user settings.
+ * Custom tools always available; server-side tools per Settings.
+ */
+function buildTools(): Anthropic.Messages.ToolUnion[] {
+  const s = settingsStore().get()
+  const tools: Anthropic.Messages.ToolUnion[] = []
+  // Custom tools — always on
+  for (const t of TOOLS) {
+    tools.push(t as Anthropic.Tool)
+  }
+  // Server-side: web_search (Anthropic-hosted, costs extra tokens)
+  if (s.enableWebSearch) {
+    tools.push({
+      type: 'web_search_20260209',
+      name: 'web_search',
+      max_uses: 5
+    } as Anthropic.Messages.WebSearchTool20260209)
+  }
+  // Memory tool wired in Phase C — TOOLS list will gain memory_20250818 there.
+  return tools
+}
+
+/**
+ * Send the full conversation history and run the agentic loop.
+ * Each turn streams text deltas to the renderer; tool calls happen client-side
+ * (via runTool) and are fed back as a tool_result message in the next turn.
  */
 export async function streamChat(
   history: ChatMessage[],
@@ -135,29 +179,68 @@ export async function streamChat(
 
   const system = buildSystemPrompt()
   const model = settingsStore().get().model
-  const messages = history.map((m) => ({ role: m.role, content: m.content }))
+  const tools = buildTools()
+  const messages: AnyMessageParam[] = history.map((m) => ({
+    role: m.role,
+    content: m.content
+  }))
+
+  let combinedText = ''
+  let turn = 0
 
   try {
-    const stream = client.messages.stream(
-      {
-        model,
-        max_tokens: 4096,
-        system,
-        messages
-      },
-      { signal: abortSignal }
-    )
+    while (turn < MAX_TURNS) {
+      turn += 1
+      const stream = client.messages.stream(
+        {
+          model,
+          max_tokens: 4096,
+          system,
+          messages,
+          tools
+        },
+        { signal: abortSignal }
+      )
 
-    // SDK ≥0.30: iterate text deltas via the .on('text') stream API.
-    // Using stream.on() is the documented interface for receiving text chunks.
-    stream.on('text', (text) => callbacks.onDelta(text))
+      // Forward text deltas from this turn to the renderer.
+      stream.on('text', (text) => {
+        combinedText += text
+        callbacks.onDelta(text)
+      })
 
-    const final = await stream.finalMessage()
-    const full = final.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map((b) => b.text)
-      .join('')
-    callbacks.onDone(full)
+      const final = await stream.finalMessage()
+
+      // Append the assistant response to history exactly as returned
+      // (text + tool_use blocks). MUST keep tool_use blocks intact for
+      // the API to accept the next turn.
+      messages.push({ role: 'assistant', content: final.content })
+
+      if (final.stop_reason !== 'tool_use') {
+        // end_turn / max_tokens / stop_sequence — finished
+        callbacks.onDone(combinedText)
+        return
+      }
+
+      // Run every requested tool, gather tool_result blocks for the next user turn.
+      const toolUses = final.content.filter(
+        (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use'
+      )
+      const toolResults: Anthropic.ToolResultBlockParam[] = []
+      for (const tu of toolUses) {
+        const result = await runTool(tu.name, tu.input)
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: tu.id,
+          content: result.content,
+          ...(result.is_error ? { is_error: true } : {})
+        })
+      }
+      messages.push({ role: 'user', content: toolResults })
+      // Loop: stream the next assistant turn.
+    }
+
+    logger.warn(`agentic loop hit MAX_TURNS=${MAX_TURNS}`)
+    callbacks.onDone(combinedText)
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
       logger.info('Stream aborted')
@@ -168,7 +251,7 @@ export async function streamChat(
   }
 }
 
-/** One-shot, non-streaming call. Used by the whisper engine. */
+/** One-shot, non-streaming call. Used by the whisper engine. No tools. */
 export async function oneShot(opts: {
   system: string
   user: string
