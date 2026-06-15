@@ -179,6 +179,16 @@ export function registerIpc(actions: AppActions): void {
   let chatBusy = false
   ipcMain.handle(IPC.CHAT_SEND, async (_e, history: ChatMessage[]) => {
     if (chatBusy) {
+      // Surface the rejection through the same event channel the renderer
+      // is already listening on, so its 'streaming' state resets and the
+      // user sees the failure instead of a stuck spinner.
+      const w = getChatWindow()
+      if (w && !w.isDestroyed()) {
+        w.webContents.send(IPC.CHAT_STREAM_EVENT, {
+          type: 'error',
+          message: 'Already streaming a previous message — please wait.'
+        })
+      }
       return { ok: false, full: '', error: 'A previous message is still streaming' }
     }
     chatBusy = true

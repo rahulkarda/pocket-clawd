@@ -97,7 +97,13 @@ export function ChatApp(): JSX.Element {
     setStreaming(true)
     setStreamBuf('')
     try {
-      await window.api.chat.send(next)
+      const result = await window.api.chat.send(next)
+      // Belt-and-suspenders: if main rejected without firing an error event,
+      // make sure the streaming flag doesn't stay stuck. The error event
+      // path covers chatBusy and most cases, but this is the safety net.
+      if (result && result.ok === false) {
+        setStreaming(false)
+      }
     } catch (err) {
       setError((err as Error).message)
       setStreaming(false)

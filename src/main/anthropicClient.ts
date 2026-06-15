@@ -3,8 +3,9 @@
  *
  * AGENTIC LOOP:
  *   We support tool use (custom todo tools, search_past_sessions, plus
- *   Anthropic-hosted web_search and web_fetch). One "send" from the
- *   renderer can produce multiple Claude turns under the hood:
+ *   client-side web_search / web_fetch and the memory_20250818 tool).
+ *   One "send" from the renderer can produce multiple Claude turns under
+ *   the hood:
  *
  *     stream → if stop_reason==='tool_use' → run tools → feed back → stream again
  *
@@ -24,7 +25,7 @@ import { getApiKey } from './keychain'
 import { settingsStore } from './settings'
 import { getDaily } from './todoStore'
 import { getTimeSlot, timeSlotLabel } from '@shared/time'
-import { runTool, TOOLS } from './tools'
+import { runTool, ALWAYS_ON_TOOLS, OPT_IN_TOOLS } from './tools'
 import { runMemory } from './memory'
 import type { ChatMessage, TimeSlot } from '@shared/types'
 
@@ -54,7 +55,7 @@ Keep questions SHORT (1–2 sentences). Never ask more than one question at a ti
 TOOLS — use them silently when natural; don't ask permission:
 - add_todo / complete_todo / delete_todo / list_todos — when the user mentions a task to track ("I should X") or finish ("X is done"), manage the list directly. Acknowledge with one short line ("added", "marked done") — don't recite the whole list.
 - search_past_sessions — when the user references something they said before ("last week", "we talked about", "remind me what I said about X").
-- web_search — for current events, facts past your training cutoff, or anything where being up-to-date matters. Don't use it for evergreen knowledge you already have.${
+- web_search / web_fetch — for current events, facts past your training cutoff, or anything where being up-to-date matters. Don't use them for evergreen knowledge you already have. Use web_fetch to read a specific page after web_search surfaces it.${
     memoryEnabled
       ? `
 
@@ -156,9 +157,13 @@ export function resetClient(): void {
 }
 
 export interface StreamCallbacks {
+  // onDelta is sync — fast path for forwarding deltas.
   onDelta: (text: string) => void
-  onDone: (full: string) => void
-  onError: (msg: string) => void
+  // onDone / onError MUST return a Promise — streamChat awaits them so
+  // any async work (writing the spec file, surfacing an error) completes
+  // before the IPC handler resolves and chatBusy is released.
+  onDone: (full: string) => void | Promise<void>
+  onError: (msg: string) => void | Promise<void>
 }
 
 const MAX_TURNS = 10
@@ -166,23 +171,64 @@ const MAX_TURNS = 10
 type AnyMessageParam = Anthropic.MessageParam
 
 /**
+ * Detect "unknown server-side tool type" rejections from Anthropic-compatible
+ * proxies (e.g. some enterprise gateways) that don't implement every hosted-tool variant.
+ * These come back as HTTP 400 with a Pydantic-style discriminator error message:
+ *   "tools.5: Input tag 'web_search_20260209' found using 'type' does not match
+ *    any of the expected tags: 'bash_20250124', 'custom', ..."
+ * We also handle a simpler "unknown tool type 'X'" phrasing as a fallback.
+ */
+function isUnknownToolError(err: unknown): { isUnknown: boolean; toolType?: string } {
+  if (!err || typeof err !== 'object') return { isUnknown: false }
+  const anyErr = err as { status?: number; message?: string; error?: { message?: string } }
+  const status = anyErr.status
+  const msg = anyErr.message ?? anyErr.error?.message ?? ''
+  // Only consider 400s (or status-less wrapped errors where we fall back to message inspection).
+  if (status !== undefined && status !== 400) return { isUnknown: false }
+  // Pattern A: Pydantic discriminator error.
+  const discriminator = msg.match(
+    /Input tag '([^']+)' found using 'type' does not match any of the expected tags/
+  )
+  if (discriminator) return { isUnknown: true, toolType: discriminator[1] }
+  // Pattern B: simpler "unknown tool type 'X'" phrasing.
+  const simple = msg.match(/unknown tool type ['"]?([\w-]+)['"]?/i)
+  if (simple) return { isUnknown: true, toolType: simple[1] }
+  return { isUnknown: false }
+}
+
+/**
+ * Reduce the tools array to only those guaranteed-supported across
+ * Anthropic-compatible proxies: client-side custom tools (no `type` field)
+ * and the memory_20250818 tool (locally implemented via runMemory).
+ */
+function stripUnsupportedTools(
+  tools: Anthropic.Messages.ToolUnion[]
+): Anthropic.Messages.ToolUnion[] {
+  return tools.filter((t) => {
+    const type = (t as { type?: string }).type
+    return type === undefined || type === 'custom' || type === 'memory_20250818'
+  })
+}
+
+/**
  * Build the tools array based on user settings.
- * Custom tools always available; server-side and memory per Settings.
+ * Custom tools always available; web tools (client-side) per Settings;
+ * memory per Settings.
  */
 function buildTools(): Anthropic.Messages.ToolUnion[] {
   const s = settingsStore().get()
   const tools: Anthropic.Messages.ToolUnion[] = []
-  // Custom tools — always on
-  for (const t of TOOLS) {
+  // Always-on custom tools — todo CRUD + past-session search.
+  for (const t of ALWAYS_ON_TOOLS) {
     tools.push(t as Anthropic.Tool)
   }
-  // Server-side: web_search (Anthropic-hosted, costs extra tokens)
+  // Opt-in custom tools — web_search / web_fetch (client-side, DDG-backed).
+  // Implemented locally in tools.ts so they work through proxies that block
+  // server-side hosted tools (e.g. some enterprise gateways).
   if (s.enableWebSearch) {
-    tools.push({
-      type: 'web_search_20260209',
-      name: 'web_search',
-      max_uses: 5
-    } as Anthropic.Messages.WebSearchTool20260209)
+    for (const t of OPT_IN_TOOLS) {
+      tools.push(t as Anthropic.Tool)
+    }
   }
   // Persistent memory — Anthropic memory_20250818 backed by local fs.
   if (s.enableMemory) {
@@ -222,37 +268,81 @@ export async function streamChat(
 
   let combinedText = ''
   let turn = 0
+  // Track whether we've already retried after a server-side tool rejection.
+  // One retry per streamChat call max — prevents infinite loops if the proxy
+  // also rejects the reduced tool set for some other reason.
+  let retried = false
+  let activeTools = tools
 
   try {
     while (turn < MAX_TURNS) {
       turn += 1
-      const stream = client.messages.stream(
-        {
-          model,
-          max_tokens: 4096,
-          system,
-          messages,
-          tools
-        },
-        { signal: abortSignal }
-      )
 
-      // Forward text deltas from this turn to the renderer.
-      stream.on('text', (text) => {
-        combinedText += text
-        callbacks.onDelta(text)
-      })
-
-      const final = await stream.finalMessage()
+      // Stream + collect the assistant's response. On an "unknown tool type"
+      // 400 from the proxy, strip server-side tools and retry the same turn
+      // ONCE. Other errors bubble up to the outer catch.
+      let final: Anthropic.Message
+      try {
+        const stream = client.messages.stream(
+          {
+            model,
+            max_tokens: 4096,
+            system,
+            messages,
+            tools: activeTools
+          },
+          { signal: abortSignal }
+        )
+        stream.on('text', (text) => {
+          combinedText += text
+          callbacks.onDelta(text)
+        })
+        final = await stream.finalMessage()
+      } catch (err) {
+        const detect = isUnknownToolError(err)
+        if (detect.isUnknown && !retried) {
+          retried = true
+          logger.warn(
+            `proxy rejected tool type "${detect.toolType ?? 'unknown'}" — stripping server-side tools and retrying once`
+          )
+          activeTools = stripUnsupportedTools(activeTools)
+          // Surface a one-line inline notice to the user.
+          callbacks.onDelta(
+            "\n\n_⚠️ Web search isn't supported by this provider — disabling and retrying_\n\n"
+          )
+          // Re-decrement turn so this rejection doesn't burn a turn.
+          turn -= 1
+          continue
+        }
+        // Not an unknown-tool error, or we've already retried — bubble up.
+        throw err
+      }
 
       // Append the assistant response to history exactly as returned
       // (text + tool_use blocks). MUST keep tool_use blocks intact for
       // the API to accept the next turn.
       messages.push({ role: 'assistant', content: final.content })
 
+      // Stop-reason handling.
+      // - tool_use: run client-side tools, feed results back, loop.
+      // - pause_turn: a server-side tool (e.g. web_search) hit its iteration
+      //   limit. The API expects us to re-send the conversation as-is to
+      //   continue; do not add any user message. Loop.
+      // - refusal: model declined for safety. Surface as error.
+      // - end_turn / max_tokens / stop_sequence: terminal.
+      if (final.stop_reason === 'pause_turn') {
+        // Loop without adding any user message — just re-send.
+        continue
+      }
+      if (final.stop_reason === 'refusal') {
+        await callbacks.onError(
+          'Claude declined to respond. This usually means the request hit a safety classifier — try rephrasing.'
+        )
+        return
+      }
       if (final.stop_reason !== 'tool_use') {
         // end_turn / max_tokens / stop_sequence — finished
-        callbacks.onDone(combinedText)
+        await callbacks.onDone(combinedText)
         return
       }
 
@@ -278,14 +368,14 @@ export async function streamChat(
     }
 
     logger.warn(`agentic loop hit MAX_TURNS=${MAX_TURNS}`)
-    callbacks.onDone(combinedText)
+    await callbacks.onDone(combinedText)
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
       logger.info('Stream aborted')
       return
     }
     logger.error('Claude stream error', err)
-    callbacks.onError(err instanceof Error ? err.message : String(err))
+    await callbacks.onError(err instanceof Error ? err.message : String(err))
   }
 }
 
