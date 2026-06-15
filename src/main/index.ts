@@ -82,13 +82,19 @@ function startWhisperIfNeeded(): void {
 }
 
 /** Polls the Keychain every 30s after a no-key bootstrap so the user can
- *  add the key in Settings without having to restart the app. */
+ *  add the key in Settings without having to restart the app. The handle
+ *  is module-scoped so will-quit can clear it. */
+let apiKeyWatchInterval: NodeJS.Timeout | null = null
 function watchForApiKey(): void {
-  const interval = setInterval(async () => {
+  if (apiKeyWatchInterval) return
+  apiKeyWatchInterval = setInterval(async () => {
     if (await hasApiKey()) {
       logger.info('API key detected — starting whisper engine')
       startWhisperIfNeeded()
-      clearInterval(interval)
+      if (apiKeyWatchInterval) {
+        clearInterval(apiKeyWatchInterval)
+        apiKeyWatchInterval = null
+      }
     }
   }, 30_000)
 }
@@ -199,4 +205,8 @@ app.on('will-quit', () => {
   unregisterAllHotkeys()
   stopWhisperEngine()
   idleTracker.stop()
+  if (apiKeyWatchInterval) {
+    clearInterval(apiKeyWatchInterval)
+    apiKeyWatchInterval = null
+  }
 })

@@ -119,11 +119,15 @@ export function Avatar(): JSX.Element {
   const variant: AvatarAnimState | 'happy' = allDone ? 'happy' : state
 
   /**
-   * Drag handling.
-   * - mousedown captures the screen-space cursor position and seeds the drag offset in main
-   * - mousemove streams new cursor positions to main; main moves the window
-   * - mouseup ends the drag, edge-snaps, and persists the position
-   * - if the cursor never moved more than 5 px (manhattan), treat as a click → open chat
+   * Drag handling — uses Pointer Events with setPointerCapture so that
+   * mousemove/mouseup keep firing even when the cursor leaves the avatar's
+   * (small) BrowserWindow. With plain mouseup-on-window the up event was
+   * silently lost on fast drags that exited the 64px window.
+   *
+   * - pointerdown captures the screen-space cursor position
+   * - pointermove streams new cursor positions to main → main moves window
+   * - pointerup / pointercancel ends the drag, edge-snaps, persists position
+   * - if cursor never moved more than 5 px (manhattan), treat as a click → open chat
    *
    * We use clientX/Y plus window.screenX/Y to compute screen-space coords,
    * because the renderer doesn't have direct access to the mouse's
@@ -132,48 +136,60 @@ export function Avatar(): JSX.Element {
   const dragRef = useRef<{
     downAt: { x: number; y: number }
     moved: boolean
+    pointerId: number
   } | null>(null)
   const CLICK_THRESHOLD_PX = 5
 
-  const onMouseDown = (e: React.MouseEvent): void => {
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>): void => {
     if (e.button !== 0) return // only primary button
+    // Capture the pointer so subsequent pointermove/pointerup events fire
+    // on this element regardless of where the cursor actually is.
+    e.currentTarget.setPointerCapture(e.pointerId)
     const screenX = e.screenX
     const screenY = e.screenY
-    dragRef.current = { downAt: { x: screenX, y: screenY }, moved: false }
+    dragRef.current = {
+      downAt: { x: screenX, y: screenY },
+      moved: false,
+      pointerId: e.pointerId
+    }
     void window.api.avatar.dragStart(screenX, screenY)
+  }
 
-    const onMove = (ev: MouseEvent): void => {
-      if (!dragRef.current) return
-      const dx = ev.screenX - dragRef.current.downAt.x
-      const dy = ev.screenY - dragRef.current.downAt.y
-      if (!dragRef.current.moved && Math.abs(dx) + Math.abs(dy) > CLICK_THRESHOLD_PX) {
-        dragRef.current.moved = true
-      }
-      if (dragRef.current.moved) {
-        void window.api.avatar.dragTo(ev.screenX, ev.screenY)
-      }
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>): void => {
+    if (!dragRef.current || e.pointerId !== dragRef.current.pointerId) return
+    const dx = e.screenX - dragRef.current.downAt.x
+    const dy = e.screenY - dragRef.current.downAt.y
+    if (!dragRef.current.moved && Math.abs(dx) + Math.abs(dy) > CLICK_THRESHOLD_PX) {
+      dragRef.current.moved = true
     }
-
-    const onUp = (): void => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-      const moved = dragRef.current?.moved ?? false
-      dragRef.current = null
-      void window.api.avatar.dragEnd()
-      if (!moved) {
-        // Tap on the avatar with no drag → open chat.
-        void window.api.chat.open()
-      }
+    if (dragRef.current.moved) {
+      void window.api.avatar.dragTo(e.screenX, e.screenY)
     }
+  }
 
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+  const onPointerEnd = (e: React.PointerEvent<HTMLDivElement>): void => {
+    if (!dragRef.current || e.pointerId !== dragRef.current.pointerId) return
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      // already released — ignore
+    }
+    const moved = dragRef.current.moved
+    dragRef.current = null
+    void window.api.avatar.dragEnd()
+    if (!moved) {
+      // Tap on the avatar with no drag → open chat.
+      void window.api.chat.open()
+    }
   }
 
   return (
     <div
       className="w-full h-full relative flex items-center justify-center cursor-grab active:cursor-grabbing"
-      onMouseDown={onMouseDown}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerEnd}
+      onPointerCancel={onPointerEnd}
     >
       {/* Glow */}
       <div

@@ -29,25 +29,65 @@ function memoryRoot(): string {
 
 /**
  * Resolve a tool-supplied path (always starts with `/memories`) to an
- * absolute filesystem path under the memory root. Throws if traversal is
- * attempted.
+ * absolute filesystem path under the memory root. Throws on traversal.
+ *
+ * This is the LEXICAL guard — it catches `../`, absolute paths, etc. It
+ * does NOT detect symlink escapes; for that, callers must additionally
+ * pass the resolved path through `assertNoSymlinkEscape` once the
+ * deepest existing parent is known.
  */
 function resolveSafe(toolPath: string): string {
   if (typeof toolPath !== 'string' || !toolPath.startsWith('/memories')) {
     throw new Error(`memory: path must start with /memories — got ${JSON.stringify(toolPath)}`)
   }
   // Strip the /memories prefix; what remains is relative to the root.
-  // Use path.posix to keep the tool's contract POSIX-shaped regardless of platform.
   const rel = toolPath.replace(/^\/memories\/?/, '')
   const root = memoryRoot()
   // Normalize and check we stay under root. Defends against `../`, absolute
-  // paths, and other escapes.
+  // paths, and other lexical escapes.
   const abs = path.resolve(root, rel)
   const rootResolved = path.resolve(root)
   if (abs !== rootResolved && !abs.startsWith(rootResolved + path.sep)) {
     throw new Error(`memory: path traversal blocked: ${toolPath}`)
   }
   return abs
+}
+
+/**
+ * Symlink-escape guard. Walks from `abs` up the tree until it finds a
+ * path component that exists on disk, realpath()s that, then checks the
+ * realpath is still within the realpath of the memory root. This catches
+ * symlinks at any layer (root → intermediate → leaf), without breaking
+ * for not-yet-existing create/rename targets.
+ */
+async function assertNoSymlinkEscape(abs: string): Promise<void> {
+  const root = memoryRoot()
+  const rootReal = await fs.realpath(root)
+  // Find the deepest existing ancestor of `abs` (including `abs` itself).
+  let probe = abs
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      const real = await fs.realpath(probe)
+      // Compare realpath of the existing ancestor against realpath of root.
+      if (real !== rootReal && !real.startsWith(rootReal + path.sep)) {
+        throw new Error('memory: symlink escape blocked')
+      }
+      return
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (code === 'ENOENT') {
+        const parent = path.dirname(probe)
+        if (parent === probe) {
+          // Climbed to filesystem root without finding anything — refuse.
+          throw new Error('memory: cannot resolve any ancestor of target')
+        }
+        probe = parent
+        continue
+      }
+      throw err
+    }
+  }
 }
 
 async function ensureRoot(): Promise<void> {
@@ -107,9 +147,16 @@ interface MemoryResult {
   is_error?: boolean
 }
 
+/** Combined lexical + symlink guard. Use this everywhere instead of bare resolveSafe. */
+async function safePath(toolPath: string): Promise<string> {
+  const abs = resolveSafe(toolPath)
+  await assertNoSymlinkEscape(abs)
+  return abs
+}
+
 async function cmd_view(input: MemoryInput): Promise<MemoryResult> {
   if (!input.path) return { is_error: true, content: 'view: path required' }
-  const abs = resolveSafe(input.path)
+  const abs = await safePath(input.path)
   let stat: import('fs').Stats
   try {
     stat = await fs.stat(abs)
@@ -142,7 +189,19 @@ async function cmd_create(input: MemoryInput): Promise<MemoryResult> {
   if (!input.path) return { is_error: true, content: 'create: path required' }
   if (input.file_text == null) return { is_error: true, content: 'create: file_text required' }
 
-  const abs = resolveSafe(input.path)
+  const abs = await safePath(input.path)
+  // Refuse to overwrite an existing file. The model should str_replace
+  // or insert into an existing memory, not silently clobber it.
+  try {
+    await fs.access(abs)
+    return {
+      is_error: true,
+      content: `create: ${input.path} already exists — use str_replace or insert to modify, or delete first`
+    }
+  } catch {
+    // ENOENT → ok to create
+  }
+
   const bytes = Buffer.byteLength(input.file_text, 'utf-8')
   if (bytes > MAX_FILE_BYTES) {
     return {
@@ -168,7 +227,7 @@ async function cmd_str_replace(input: MemoryInput): Promise<MemoryResult> {
   if (input.old_str == null || input.new_str == null) {
     return { is_error: true, content: 'str_replace: old_str and new_str required' }
   }
-  const abs = resolveSafe(input.path)
+  const abs = await safePath(input.path)
   let body: string
   try {
     body = await fs.readFile(abs, 'utf-8')
@@ -199,7 +258,7 @@ async function cmd_insert(input: MemoryInput): Promise<MemoryResult> {
   if (input.insert_line == null || input.insert_text == null) {
     return { is_error: true, content: 'insert: insert_line and insert_text required' }
   }
-  const abs = resolveSafe(input.path)
+  const abs = await safePath(input.path)
   let body: string
   try {
     body = await fs.readFile(abs, 'utf-8')
@@ -222,7 +281,7 @@ async function cmd_insert(input: MemoryInput): Promise<MemoryResult> {
 
 async function cmd_delete(input: MemoryInput): Promise<MemoryResult> {
   if (!input.path) return { is_error: true, content: 'delete: path required' }
-  const abs = resolveSafe(input.path)
+  const abs = await safePath(input.path)
   try {
     const stat = await fs.stat(abs)
     if (stat.isDirectory()) {
@@ -240,8 +299,19 @@ async function cmd_rename(input: MemoryInput): Promise<MemoryResult> {
   if (!input.old_path || !input.new_path) {
     return { is_error: true, content: 'rename: old_path and new_path required' }
   }
-  const oldAbs = resolveSafe(input.old_path)
-  const newAbs = resolveSafe(input.new_path)
+  const oldAbs = await safePath(input.old_path)
+  const newAbs = await safePath(input.new_path)
+  // POSIX `rename` silently overwrites the destination — refuse instead.
+  // The model should `delete` the destination first if that's truly intended.
+  try {
+    await fs.access(newAbs)
+    return {
+      is_error: true,
+      content: `rename: destination ${input.new_path} already exists — delete it first`
+    }
+  } catch {
+    // ENOENT → ok to rename
+  }
   try {
     await fs.mkdir(path.dirname(newAbs), { recursive: true })
     await fs.rename(oldAbs, newAbs)
