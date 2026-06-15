@@ -1,12 +1,16 @@
 /**
  * Custom tool definitions exposed to Clawd.
  *
- * Five tools — todo CRUD + past-session search:
+ * ALWAYS_ON: todo CRUD + past-session search (always registered).
  *   add_todo          create a todo
  *   complete_todo     mark a todo done (resolves by id OR fuzzy text match)
  *   delete_todo       remove a todo
  *   list_todos        snapshot current todos
  *   search_past_sessions  grep .spec.md transcripts in the output dir
+ *
+ * OPT_IN: web access tools (registered only when settings.enableWebSearch is on).
+ *   web_search        DuckDuckGo HTML search, parsed via regex
+ *   web_fetch         fetch a URL and return text
  *
  * Each tool has a hard input-validation step before doing anything,
  * since Claude can in principle pass anything (typed, but not enforced
@@ -29,7 +33,13 @@ import type { Todo } from '@shared/types'
 // Tool input schemas (Anthropic JSON-schema dialect)
 // ────────────────────────────────────────────────────────────
 
-export const TOOLS = [
+const USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+const FETCH_TIMEOUT_MS = 15_000
+const MAX_RESPONSE_CHARS = 8000
+const MAX_SNIPPET_CHARS = 300
+
+export const ALWAYS_ON_TOOLS = [
   {
     name: 'add_todo',
     description:
@@ -107,6 +117,48 @@ export const TOOLS = [
     }
   }
 ]
+
+export const OPT_IN_TOOLS = [
+  {
+    name: 'web_search',
+    description:
+      'Search the web for current information, recent events, or facts past your training cutoff. Returns top 5-10 results with title, URL, and snippet.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The search query. Trimmed to 500 chars.'
+        },
+        max_results: {
+          type: 'integer',
+          description: 'Max results to return. Default 7, max 10.',
+          minimum: 1,
+          maximum: 10
+        }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'web_fetch',
+    description:
+      'Fetch a single http(s) URL and return its text content (HTML stripped to plain text). Capped at 8000 chars. Use after web_search when you need the body of a specific result.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        url: {
+          type: 'string',
+          description: 'Absolute http or https URL to fetch.'
+        }
+      },
+      required: ['url']
+    }
+  }
+]
+
+/** Combined list of every tool name we know how to dispatch. */
+export const TOOLS = [...ALWAYS_ON_TOOLS, ...OPT_IN_TOOLS]
 
 // ────────────────────────────────────────────────────────────
 // Tool implementations
@@ -233,6 +285,195 @@ async function tool_search_past_sessions(input: {
 }
 
 // ────────────────────────────────────────────────────────────
+// web_search / web_fetch — client-side, no API key required
+// ────────────────────────────────────────────────────────────
+
+/**
+ * Decode DDG's redirect URLs. They look like:
+ *   //duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2F&rut=...
+ * or
+ *   /l/?uddg=https%3A%2F%2Fexample.com%2F
+ * If the input isn't a redirect, return it as-is (after //→https:// fix).
+ */
+function decodeDdgUrl(raw: string): string {
+  let u = raw.trim()
+  if (u.startsWith('//')) u = 'https:' + u
+  // Match the uddg query param.
+  const m = u.match(/[?&]uddg=([^&]+)/)
+  if (m) {
+    try {
+      return decodeURIComponent(m[1])
+    } catch {
+      return u
+    }
+  }
+  return u
+}
+
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
+}
+
+function stripTags(html: string): string {
+  return decodeHtmlEntities(html.replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim()
+}
+
+interface SearchResult {
+  title: string
+  url: string
+  snippet: string
+}
+
+/**
+ * Parse the DuckDuckGo HTML SERP. We look for blocks that contain a
+ * `.result__a` anchor (title+href) and try to associate a `.result__snippet`
+ * sibling. Defensive: any failure returns an empty list rather than throwing.
+ */
+function parseDdgHtml(html: string, maxResults: number): SearchResult[] {
+  const results: SearchResult[] = []
+  // Each result is roughly: <a class="result__a" href="…">TITLE</a> … <a class="result__snippet">SNIPPET</a>
+  // We pair them by walking the title regex and then searching forward for the
+  // next snippet within a reasonable window.
+  const titleRe = /<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g
+  const snippetRe = /<a[^>]*class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/g
+
+  // Pre-collect snippet positions so we can pick the next one after each title.
+  const snippets: { index: number; text: string }[] = []
+  let sm: RegExpExecArray | null
+  while ((sm = snippetRe.exec(html)) !== null) {
+    snippets.push({ index: sm.index, text: stripTags(sm[1]) })
+  }
+
+  let tm: RegExpExecArray | null
+  while ((tm = titleRe.exec(html)) !== null && results.length < maxResults) {
+    const rawHref = tm[1]
+    const titleHtml = tm[2]
+    const url = decodeDdgUrl(decodeHtmlEntities(rawHref))
+    const title = stripTags(titleHtml)
+    if (!title || !url) continue
+    // Find first snippet whose start index is after this title's match.
+    const nextSnip = snippets.find((s) => s.index > tm!.index)
+    let snippet = nextSnip ? nextSnip.text : ''
+    if (snippet.length > MAX_SNIPPET_CHARS) {
+      snippet = snippet.slice(0, MAX_SNIPPET_CHARS - 1) + '…'
+    }
+    results.push({ title, url, snippet })
+  }
+  return results
+}
+
+async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, {
+      headers: {
+        'User-Agent': USER_AGENT,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9'
+      },
+      signal: controller.signal,
+      redirect: 'follow'
+    })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function tool_web_search(input: {
+  query: string
+  max_results?: number
+}): Promise<ToolResult> {
+  if (typeof input.query !== 'string' || !input.query.trim()) {
+    return { is_error: true, content: 'web_search: query must be a non-empty string' }
+  }
+  const query = input.query.trim().slice(0, 500)
+  const max = Math.max(1, Math.min(10, input.max_results ?? 7))
+  const url = `https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`
+
+  let html: string
+  try {
+    const res = await fetchWithTimeout(url, FETCH_TIMEOUT_MS)
+    if (!res.ok) {
+      return { is_error: true, content: `web_search: HTTP ${res.status} from DuckDuckGo` }
+    }
+    html = await res.text()
+  } catch (err) {
+    const msg = (err as Error).name === 'AbortError' ? 'request timed out' : (err as Error).message
+    return { is_error: true, content: `web_search: ${msg}` }
+  }
+
+  let results: SearchResult[]
+  try {
+    results = parseDdgHtml(html, max)
+  } catch (err) {
+    return { is_error: true, content: `web_search: parse failed (${(err as Error).message})` }
+  }
+
+  if (results.length === 0) {
+    return { content: JSON.stringify({ query, results: [], note: 'No results parsed.' }) }
+  }
+
+  // Cap total response size; trim trailing results if needed.
+  let payload = JSON.stringify({ query, results }, null, 2)
+  if (payload.length > MAX_RESPONSE_CHARS) {
+    while (results.length > 1 && payload.length > MAX_RESPONSE_CHARS) {
+      results.pop()
+      payload = JSON.stringify({ query, results, truncated: true }, null, 2)
+    }
+    if (payload.length > MAX_RESPONSE_CHARS) {
+      payload = payload.slice(0, MAX_RESPONSE_CHARS - 1) + '…'
+    }
+  }
+  return { content: payload }
+}
+
+async function tool_web_fetch(input: { url: string }): Promise<ToolResult> {
+  if (typeof input.url !== 'string' || !input.url.trim()) {
+    return { is_error: true, content: 'web_fetch: url must be a non-empty string' }
+  }
+  let parsed: URL
+  try {
+    parsed = new URL(input.url.trim())
+  } catch {
+    return { is_error: true, content: 'web_fetch: invalid URL' }
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { is_error: true, content: 'web_fetch: only http(s) URLs are allowed' }
+  }
+
+  let body: string
+  try {
+    const res = await fetchWithTimeout(parsed.toString(), FETCH_TIMEOUT_MS)
+    if (!res.ok) {
+      return { is_error: true, content: `web_fetch: HTTP ${res.status}` }
+    }
+    body = await res.text()
+  } catch (err) {
+    const msg = (err as Error).name === 'AbortError' ? 'request timed out' : (err as Error).message
+    return { is_error: true, content: `web_fetch: ${msg}` }
+  }
+
+  // Strip <script>/<style> blocks first, then tags.
+  const cleaned = body
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+  let text = stripTags(cleaned)
+  if (text.length > MAX_RESPONSE_CHARS) {
+    text = text.slice(0, MAX_RESPONSE_CHARS - 1) + '…'
+  }
+  return { content: JSON.stringify({ url: parsed.toString(), text }) }
+}
+
+// ────────────────────────────────────────────────────────────
 // Dispatch
 // ────────────────────────────────────────────────────────────
 
@@ -250,6 +491,10 @@ export async function runTool(name: string, input: unknown): Promise<ToolResult>
         return await tool_list_todos()
       case 'search_past_sessions':
         return await tool_search_past_sessions(input as { query: string; limit?: number })
+      case 'web_search':
+        return await tool_web_search(input as { query: string; max_results?: number })
+      case 'web_fetch':
+        return await tool_web_fetch(input as { url: string })
       default:
         return { is_error: true, content: `Unknown tool: ${name}` }
     }

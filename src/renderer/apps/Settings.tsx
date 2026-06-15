@@ -286,7 +286,7 @@ export function SettingsApp(): JSX.Element {
           hint="Clawd uses tools to manage todos, search past sessions, browse the web, and remember things between sessions."
         >
           <Toggle
-            label="Web search (Anthropic-hosted, billed per use)"
+            label="Web search (DuckDuckGo, free, may rate-limit)"
             value={settings.enableWebSearch}
             onChange={(v) => update({ enableWebSearch: v })}
           />

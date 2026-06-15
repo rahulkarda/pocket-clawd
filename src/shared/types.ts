@@ -88,7 +88,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   whisperOnIdleAlert: true,
   showOnAllSpaces: true,
   openAtLogin: false,
-  enableWebSearch: true,
+  // Off by default — server-side web_search is billable, and some
+  // proxies (e.g. enterprise gateways) don't allow it. Toggle in Settings.
+  enableWebSearch: false,
   enableMemory: true,
   onboarded: false
 }
