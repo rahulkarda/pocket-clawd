@@ -160,6 +160,45 @@ export const OPT_IN_TOOLS = [
 /** Combined list of every tool name we know how to dispatch. */
 export const TOOLS = [...ALWAYS_ON_TOOLS, ...OPT_IN_TOOLS]
 
+/**
+ * Read-only descriptor surfaced to the Companion (info) window.
+ * Categories are coarse buckets used for UI chip colors:
+ *   - todo    : daily-list manipulation
+ *   - memory  : persistent-storage and past-session retrieval
+ *   - web     : outbound HTTP (DuckDuckGo + plain fetch)
+ */
+export type ToolCategory = 'todo' | 'memory' | 'web'
+
+export interface ToolDescriptor {
+  name: string
+  description: string
+  category: ToolCategory
+  alwaysOn: boolean
+}
+
+const CATEGORY_BY_NAME: Record<string, ToolCategory> = {
+  add_todo: 'todo',
+  complete_todo: 'todo',
+  delete_todo: 'todo',
+  list_todos: 'todo',
+  search_past_sessions: 'memory',
+  web_search: 'web',
+  web_fetch: 'web'
+}
+
+export function getToolsetForCompanion(): ToolDescriptor[] {
+  const decorate = (t: { name: string; description: string }, alwaysOn: boolean): ToolDescriptor => ({
+    name: t.name,
+    description: t.description,
+    category: CATEGORY_BY_NAME[t.name] ?? 'todo',
+    alwaysOn
+  })
+  return [
+    ...ALWAYS_ON_TOOLS.map((t) => decorate(t, true)),
+    ...OPT_IN_TOOLS.map((t) => decorate(t, false))
+  ]
+}
+
 // ────────────────────────────────────────────────────────────
 // Tool implementations
 // ────────────────────────────────────────────────────────────

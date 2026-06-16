@@ -9,7 +9,7 @@ import * as keychain from './keychain'
 import { settingsStore } from './settings'
 import { resetClient, streamChat } from './anthropicClient'
 import { extractSpec, stripSpecBlock, writeSpec, setLastSpec } from './specWriter'
-import { clearMemory, getMemoryRoot } from './memory'
+import { clearMemory, getMemoryRoot, getMemoryStats } from './memory'
 import idleTracker from './idleTracker'
 import {
   addTodo,
@@ -30,11 +30,22 @@ import {
   closeTodoWindow,
   getTodoWindow,
   createSettingsWindow,
-  closeSettingsWindow
+  closeSettingsWindow,
+  createCompanionWindow,
+  closeCompanionWindow,
+  createPomodoroWindow,
+  closePomodoroWindow
 } from './secondaryWindows'
-import { resizeAvatar, getAvatarWindow, startDrag, dragTo, endDrag } from './avatarWindow'
+import { resizeAvatar, getAvatarWindow, startDrag, dragTo, endDrag, getLastLayout } from './avatarWindow'
 import { showAvatarContextMenu, type AvatarMenuActions } from './avatarMenu'
 import { registerHotkey } from './hotkey'
+import { getToolsetForCompanion } from './tools'
+import * as funEngine from './funEngine'
+import * as pomodoro from './pomodoro'
+import * as petting from './pettingEngine'
+import * as snackEngine from './snackEngine'
+import * as collection from './collection'
+import * as achievements from './achievements'
 import type { ChatMessage, AppSettings, ChatStreamEvent } from '@shared/types'
 
 interface AppActions extends AvatarMenuActions {
@@ -54,32 +65,110 @@ export function registerIpc(actions: AppActions): void {
 
   ipcMain.handle(IPC.SETTINGS_UPDATE, (_e, patch: Partial<AppSettings>) => {
     // Defensive sanitization — IPC inputs cross a trust boundary even
-    // though the only caller is our own renderer.
-    const clean: Partial<AppSettings> = { ...patch }
-    if (typeof clean.userContext === 'string') {
-      clean.userContext = clean.userContext.slice(0, 4000)
+    // though the only caller is our own renderer. Build the clean patch
+    // FIELD-BY-FIELD with an allow-list — never spread `patch` directly,
+    // because TypeScript's Partial<AppSettings> is erased at runtime and
+    // any extra keys in the renderer payload would otherwise persist.
+    const clean: Partial<AppSettings> = {}
+    if (typeof patch.userContext === 'string') {
+      clean.userContext = patch.userContext.slice(0, 4000)
     }
-    if (typeof clean.baseURL === 'string') {
-      clean.baseURL = clean.baseURL.trim().slice(0, 500)
+    if (typeof patch.baseURL === 'string') {
+      clean.baseURL = patch.baseURL.trim().slice(0, 500)
     }
-    if (typeof clean.hotkey === 'string') {
-      clean.hotkey = clean.hotkey.trim().slice(0, 100)
+    if (typeof patch.hotkey === 'string') {
+      clean.hotkey = patch.hotkey.trim().slice(0, 100)
     }
-    if (clean.whisperIntervalMin !== undefined) {
-      const n = Number(clean.whisperIntervalMin)
+    if (typeof patch.outputDir === 'string') {
+      clean.outputDir = patch.outputDir.slice(0, 1024)
+    }
+    if (typeof patch.model === 'string') {
+      clean.model = patch.model.slice(0, 100)
+    }
+    if (patch.whisperIntervalMin !== undefined) {
+      const n = Number(patch.whisperIntervalMin)
       clean.whisperIntervalMin = Number.isFinite(n) ? Math.max(1, Math.min(60, n)) : 8
     }
-    if (clean.whisperIntervalMax !== undefined) {
-      const n = Number(clean.whisperIntervalMax)
+    if (patch.whisperIntervalMax !== undefined) {
+      const n = Number(patch.whisperIntervalMax)
       clean.whisperIntervalMax = Number.isFinite(n) ? Math.max(1, Math.min(60, n)) : 12
     }
-    if (clean.idleAlertMinutes !== undefined) {
-      const n = Number(clean.idleAlertMinutes)
+    if (patch.idleAlertMinutes !== undefined) {
+      const n = Number(patch.idleAlertMinutes)
       clean.idleAlertMinutes = Number.isFinite(n) ? Math.max(5, Math.min(240, n)) : 30
     }
-    if (clean.avatarSize !== undefined) {
-      const n = Number(clean.avatarSize)
+    if (patch.avatarSize !== undefined) {
+      const n = Number(patch.avatarSize)
       clean.avatarSize = Number.isFinite(n) ? Math.max(40, Math.min(120, n)) : 64
+    }
+    if (patch.avatarPosition !== undefined) {
+      // null = unset; otherwise must be {x:number, y:number}
+      if (patch.avatarPosition === null) {
+        clean.avatarPosition = null
+      } else if (
+        typeof patch.avatarPosition === 'object' &&
+        Number.isFinite(patch.avatarPosition.x) &&
+        Number.isFinite(patch.avatarPosition.y)
+      ) {
+        clean.avatarPosition = { x: patch.avatarPosition.x, y: patch.avatarPosition.y }
+      }
+    }
+    if (patch.pomodoroWorkMin !== undefined) {
+      const n = Number(patch.pomodoroWorkMin)
+      clean.pomodoroWorkMin = Number.isFinite(n) ? Math.max(1, Math.min(180, Math.round(n))) : 25
+    }
+    if (patch.pomodoroShortBreakMin !== undefined) {
+      const n = Number(patch.pomodoroShortBreakMin)
+      clean.pomodoroShortBreakMin = Number.isFinite(n) ? Math.max(1, Math.min(60, Math.round(n))) : 5
+    }
+    if (patch.pomodoroLongBreakMin !== undefined) {
+      const n = Number(patch.pomodoroLongBreakMin)
+      clean.pomodoroLongBreakMin = Number.isFinite(n) ? Math.max(1, Math.min(120, Math.round(n))) : 15
+    }
+    if (patch.pomodoroCyclesBeforeLongBreak !== undefined) {
+      const n = Number(patch.pomodoroCyclesBeforeLongBreak)
+      clean.pomodoroCyclesBeforeLongBreak = Number.isFinite(n) ? Math.max(1, Math.min(12, Math.round(n))) : 4
+    }
+    if (patch.pomodoroAutoStartNext !== undefined) clean.pomodoroAutoStartNext = patch.pomodoroAutoStartNext === true
+    if (patch.pomodoroNotify !== undefined) clean.pomodoroNotify = patch.pomodoroNotify === true
+    if (patch.pomodoroSuggestOnFirstTodo !== undefined) clean.pomodoroSuggestOnFirstTodo = patch.pomodoroSuggestOnFirstTodo === true
+    if (patch.whisperOnIdleAlert !== undefined) clean.whisperOnIdleAlert = patch.whisperOnIdleAlert === true
+    if (patch.showOnAllSpaces !== undefined) clean.showOnAllSpaces = patch.showOnAllSpaces === true
+    if (patch.openAtLogin !== undefined) clean.openAtLogin = patch.openAtLogin === true
+    if (patch.enableWebSearch !== undefined) clean.enableWebSearch = patch.enableWebSearch === true
+    if (patch.enableMemory !== undefined) clean.enableMemory = patch.enableMemory === true
+    if (patch.onboarded !== undefined) clean.onboarded = patch.onboarded === true
+    if (patch.costume !== undefined) {
+      const allowed = ['none', 'santa', 'shades', 'party', 'witch'] as const
+      clean.costume = (allowed as readonly string[]).includes(patch.costume as string)
+        ? (patch.costume as AppSettings['costume'])
+        : 'none'
+    }
+    if (patch.birthday !== undefined) {
+      if (patch.birthday === null) {
+        clean.birthday = null
+      } else if (
+        typeof patch.birthday === 'object' &&
+        Number.isFinite(patch.birthday.month) &&
+        Number.isFinite(patch.birthday.day) &&
+        patch.birthday.month >= 1 && patch.birthday.month <= 12 &&
+        patch.birthday.day >= 1 && patch.birthday.day <= 31
+      ) {
+        clean.birthday = {
+          month: Math.round(patch.birthday.month),
+          day: Math.round(patch.birthday.day)
+        }
+      } else {
+        clean.birthday = null
+      }
+    }
+    if (patch.wakeGreetings !== undefined) {
+      clean.wakeGreetings = patch.wakeGreetings === true
+    }
+    if (patch.mute !== undefined) clean.mute = patch.mute === true
+    if (patch.volume !== undefined) {
+      const n = Number(patch.volume)
+      clean.volume = Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.6
     }
 
     const prev = settingsStore().get()
@@ -101,6 +190,9 @@ export function registerIpc(actions: AppActions): void {
         openAsHidden: false
       })
     }
+    // Note: settingsStore.update() already broadcasts SETTINGS_CHANGED to
+    // every window. The previous explicit broadcast call here was a
+    // duplicate; removed to avoid double-firing renderer subscribers.
     return next
   })
 
@@ -172,6 +264,22 @@ export function registerIpc(actions: AppActions): void {
     createSettingsWindow()
   })
   ipcMain.handle(IPC.SETTINGS_WINDOW_CLOSE, () => closeSettingsWindow())
+  ipcMain.handle(IPC.COMPANION_WINDOW_OPEN, () => {
+    createCompanionWindow()
+  })
+  ipcMain.handle(IPC.COMPANION_WINDOW_CLOSE, () => closeCompanionWindow())
+
+  // ─── Companion (read-only info queries) ─────────────
+  ipcMain.handle(IPC.COMPANION_GET_TOOLSET, () => getToolsetForCompanion())
+  ipcMain.handle(IPC.COMPANION_GET_MEMORY_INFO, async () => {
+    try {
+      return await getMemoryStats()
+    } catch (err) {
+      logger.warn('getMemoryStats failed', err)
+      return { root: getMemoryRoot(), totalBytes: 0, fileCount: 0 }
+    }
+  })
+  ipcMain.handle(IPC.COMPANION_GET_APP_VERSION, () => app.getVersion())
 
   // ─── Chat ───────────────────────────────────────────
   // Guard against concurrent chat sends from the same renderer — without
@@ -270,6 +378,84 @@ export function registerIpc(actions: AppActions): void {
   ipcMain.handle(IPC.AVATAR_HOVER_SUGGEST, async () => {
     const { generateHoverSuggestion } = await import('./whisperEngine')
     return await generateHoverSuggestion()
+  })
+
+  /** Fun mode toggle. */
+  ipcMain.handle(IPC.AVATAR_FUN_TOGGLE, () => {
+    funEngine.toggle()
+    return funEngine.isActive()
+  })
+
+  /** Play fetch — 60-second fun mode session. */
+  ipcMain.handle(IPC.AVATAR_FUN_FETCH, () => {
+    funEngine.playFetch(60_000)
+    return funEngine.isActive()
+  })
+
+  /** Synchronous fetch of last broadcast layout (or null). */
+  ipcMain.handle(IPC.AVATAR_GET_LAYOUT, () => getLastLayout())
+
+  // ─── Pomodoro ───────────────────────────────────────
+  ipcMain.handle(IPC.POMODORO_WINDOW_OPEN, () => {
+    createPomodoroWindow()
+  })
+  ipcMain.handle(IPC.POMODORO_WINDOW_CLOSE, () => closePomodoroWindow())
+  ipcMain.handle(IPC.POMODORO_GET_STATUS, () => pomodoro.getStatus())
+  ipcMain.handle(
+    IPC.POMODORO_START,
+    (_e, rawPayload: unknown) => {
+      // Defensive validation — TypeScript typing on the renderer doesn't
+      // protect main from a malformed payload. A non-string taskLabel
+      // would crash the engine on `taskLabel.slice(...)`, and an unknown
+      // phase string would NaN out the timer math.
+      const payload =
+        rawPayload && typeof rawPayload === 'object' ? (rawPayload as Record<string, unknown>) : {}
+      const taskLabel =
+        typeof payload.taskLabel === 'string' ? payload.taskLabel : ''
+      const allowedPhases = ['work', 'short-break', 'long-break'] as const
+      const phase = (allowedPhases as readonly string[]).includes(payload.phase as string)
+        ? (payload.phase as 'work' | 'short-break' | 'long-break')
+        : 'work'
+      pomodoro.startSession(taskLabel, phase)
+      return pomodoro.getStatus()
+    }
+  )
+  ipcMain.handle(IPC.POMODORO_PAUSE, () => {
+    pomodoro.pause()
+    return pomodoro.getStatus()
+  })
+  ipcMain.handle(IPC.POMODORO_RESUME, () => {
+    pomodoro.resume()
+    return pomodoro.getStatus()
+  })
+  ipcMain.handle(IPC.POMODORO_RESET, () => {
+    pomodoro.reset()
+    return pomodoro.getStatus()
+  })
+  ipcMain.handle(IPC.POMODORO_SKIP, () => {
+    pomodoro.skip()
+    return pomodoro.getStatus()
+  })
+
+  // ─── Petting ────────────────────────────────────────
+  ipcMain.handle(IPC.PET_REGISTER, () => petting.registerPet())
+  ipcMain.handle(IPC.PET_GET_STATS, () => petting.getStats())
+
+  // ─── Snack ──────────────────────────────────────────
+  ipcMain.handle(IPC.SNACK_GIVE, () => snackEngine.giveSnack())
+  ipcMain.handle(IPC.SNACK_GET_STATS, () => snackEngine.getStats())
+
+  // ─── Collection ─────────────────────────────────────
+  ipcMain.handle(IPC.COLLECTION_GET, () => collection.getState())
+
+  // ─── Achievements ───────────────────────────────────
+  ipcMain.handle(IPC.ACHIEVEMENTS_GET_CATALOG, () => achievements.getCatalog())
+  ipcMain.handle(IPC.ACHIEVEMENTS_GET_EARNED, () => achievements.getEarned())
+
+  // ─── Pomodoro streak ────────────────────────────────
+  ipcMain.handle(IPC.POMODORO_STREAK_GET, async () => {
+    const m = await import('./pomodoroStreak')
+    return m.getState()
   })
 
   // ─── Auto-update ────────────────────────────────────

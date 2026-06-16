@@ -4,6 +4,7 @@ export const IPC = {
   // ─── Settings ───────────────────────────────────────
   SETTINGS_GET: 'settings:get',
   SETTINGS_UPDATE: 'settings:update',
+  SETTINGS_CHANGED: 'settings:changed', // broadcast — fires after every settings update
   SETTINGS_GET_API_KEY_PRESENT: 'settings:apiKey:present',
   SETTINGS_SET_API_KEY: 'settings:apiKey:set',
   SETTINGS_CLEAR_API_KEY: 'settings:apiKey:clear',
@@ -20,6 +21,13 @@ export const IPC = {
   TODO_CLOSE: 'todo:close',
   SETTINGS_WINDOW_OPEN: 'settings-window:open',
   SETTINGS_WINDOW_CLOSE: 'settings-window:close',
+  COMPANION_WINDOW_OPEN: 'companion-window:open',
+  COMPANION_WINDOW_CLOSE: 'companion-window:close',
+
+  // ─── Companion (read-only info) ─────────────────────
+  COMPANION_GET_TOOLSET: 'companion:get-toolset',
+  COMPANION_GET_MEMORY_INFO: 'companion:get-memory-info',
+  COMPANION_GET_APP_VERSION: 'companion:get-app-version',
 
   // ─── Chat ───────────────────────────────────────────
   CHAT_SEND: 'chat:send',
@@ -46,6 +54,16 @@ export const IPC = {
   AVATAR_WHISPER: 'avatar:whisper', // broadcast
   AVATAR_CONTEXT_MENU: 'avatar:context-menu',
   AVATAR_HOVER_SUGGEST: 'avatar:hover-suggest',
+  AVATAR_LAYOUT: 'avatar:layout', // broadcast — slot inset (x,y) where avatar sits inside the window
+  AVATAR_GET_LAYOUT: 'avatar:get-layout', // request: synchronous fetch of current layout
+  AVATAR_FUN_TOGGLE: 'avatar:fun-toggle', // request: toggle fun mode on/off
+  AVATAR_FUN_FETCH: 'avatar:fun-fetch', // request: 60-second fetch session
+  AVATAR_FUN_STATE: 'avatar:fun-state', // broadcast — fun mode is currently active?
+  AVATAR_FUN_FRAME: 'avatar:fun-frame', // broadcast — per-frame transform for the avatar
+  AVATAR_RAVE_STATE: 'avatar:rave-state', // broadcast — Konami-triggered rave mode active flag
+  AVATAR_GAZE: 'avatar:gaze', // broadcast — direction Clawd should glance (left/right/none)
+  AVATAR_EMOTE: 'avatar:emote', // broadcast — momentary emoji emote (sweat/etc)
+  AVATAR_PLAY_SOUND: 'avatar:play-sound', // broadcast — renderer plays a synthesized cue
 
   // ─── App ────────────────────────────────────────────
   APP_QUIT: 'app:quit',
@@ -56,7 +74,41 @@ export const IPC = {
   UPDATE_STATUS: 'update:status', // broadcast
   UPDATE_CHECK_NOW: 'update:check-now',
   UPDATE_GET_LAST: 'update:get-last',
-  UPDATE_QUIT_AND_INSTALL: 'update:quit-and-install'
+  UPDATE_QUIT_AND_INSTALL: 'update:quit-and-install',
+
+  // ─── Pomodoro ───────────────────────────────────────
+  POMODORO_WINDOW_OPEN: 'pomodoro-window:open',
+  POMODORO_WINDOW_CLOSE: 'pomodoro-window:close',
+  POMODORO_GET_STATUS: 'pomodoro:get-status',
+  POMODORO_START: 'pomodoro:start',
+  POMODORO_PAUSE: 'pomodoro:pause',
+  POMODORO_RESUME: 'pomodoro:resume',
+  POMODORO_RESET: 'pomodoro:reset',
+  POMODORO_SKIP: 'pomodoro:skip',
+  POMODORO_STATUS: 'pomodoro:status', // broadcast
+
+  // ─── Petting ────────────────────────────────────────
+  PET_REGISTER: 'pet:register', // request: register a single pet event
+  PET_GET_STATS: 'pet:get-stats',
+  PET_EVENT: 'pet:event', // broadcast — fires on every pet
+
+  // ─── Snack ──────────────────────────────────────────
+  SNACK_GIVE: 'snack:give', // request: give Clawd a snack
+  SNACK_GET_STATS: 'snack:get-stats',
+  SNACK_EVENT: 'snack:event', // broadcast — fires when a snack is given
+
+  // ─── Collection ─────────────────────────────────────
+  COLLECTION_GET: 'collection:get',
+  COLLECTION_EVENT: 'collection:event', // broadcast — fires when a new item is earned
+
+  // ─── Achievements ───────────────────────────────────
+  ACHIEVEMENTS_GET_CATALOG: 'achievements:get-catalog',
+  ACHIEVEMENTS_GET_EARNED: 'achievements:get-earned',
+  ACHIEVEMENTS_EVENT: 'achievements:event', // broadcast — fires when one is earned
+
+  // ─── Pomodoro streak ────────────────────────────────
+  POMODORO_STREAK_GET: 'pomodoro-streak:get',
+  POMODORO_STREAK_STATE: 'pomodoro-streak:state' // broadcast
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

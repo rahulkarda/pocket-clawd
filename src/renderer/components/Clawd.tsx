@@ -124,6 +124,39 @@ const Happy: ComponentType<SVGProps<SVGSVGElement>> = (props) => (
 )
 
 /**
+ * Blush — used while being petted. Closed-eye smile + pink cheeks. Body
+ * matches the Idle pose exactly so the pet animation is purely a face change.
+ */
+const Blush: ComponentType<SVGProps<SVGSVGElement>> = (props) => (
+  <svg viewBox="0 0 64 64" shapeRendering="crispEdges" xmlns="http://www.w3.org/2000/svg" {...props}>
+    {/* ear nubs */}
+    <rect x="4" y="18" width="4" height="8" rx="2" fill="#D4622A" />
+    <rect x="56" y="18" width="4" height="8" rx="2" fill="#D4622A" />
+    {/* body */}
+    <rect x="8" y="12" width="48" height="32" rx="4" fill="#D4622A" />
+    <rect x="8" y="40" width="48" height="4" fill="#A84B1F" />
+    {/* closed-eye "^^" — left */}
+    <rect x="18" y="22" width="8" height="2" fill="#1a1208" />
+    <rect x="16" y="24" width="2" height="2" fill="#1a1208" />
+    <rect x="26" y="24" width="2" height="2" fill="#1a1208" />
+    {/* closed-eye "^^" — right */}
+    <rect x="38" y="22" width="8" height="2" fill="#1a1208" />
+    <rect x="36" y="24" width="2" height="2" fill="#1a1208" />
+    <rect x="46" y="24" width="2" height="2" fill="#1a1208" />
+    {/* pink blush cheeks */}
+    <rect x="12" y="30" width="6" height="4" rx="1" fill="#F8A8B0" />
+    <rect x="46" y="30" width="6" height="4" rx="1" fill="#F8A8B0" />
+    {/* legs */}
+    <rect x="14" y="44" width="8" height="12" rx="2" fill="#D4622A" />
+    <rect x="28" y="44" width="8" height="12" rx="2" fill="#D4622A" />
+    <rect x="42" y="44" width="8" height="12" rx="2" fill="#D4622A" />
+    <rect x="14" y="54" width="8" height="2" fill="#A84B1F" />
+    <rect x="28" y="54" width="8" height="2" fill="#A84B1F" />
+    <rect x="42" y="54" width="8" height="2" fill="#A84B1F" />
+  </svg>
+)
+
+/**
  * Pick which variant to show based on:
  * - explicit avatar animation state
  * - todo completion (overrides → happy when ratio === 1)
@@ -141,6 +174,8 @@ export function Clawd({ state, todosComplete, ...rest }: ClawdProps): JSX.Elemen
       return <Active {...rest} />
     case 'idle-alert':
       return <IdleAlert {...rest} />
+    case 'blush':
+      return <Blush {...rest} />
     case 'whisper':
     case 'idle':
     default:
@@ -148,4 +183,4 @@ export function Clawd({ state, todosComplete, ...rest }: ClawdProps): JSX.Elemen
   }
 }
 
-export const ClawdVariants = { Idle, Active, IdleAlert, Happy }
+export const ClawdVariants = { Idle, Active, IdleAlert, Happy, Blush }

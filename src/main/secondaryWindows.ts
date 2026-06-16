@@ -1,15 +1,21 @@
-/** Floating Todo panel + Settings panel — both frameless, alwaysOnTop. */
+/** Floating Todo panel + Settings panel + Companion (info) panel. */
 import { BrowserWindow, screen } from 'electron'
 import path from 'path'
 import { getAvatarWindow } from './avatarWindow'
 
 let todoWin: BrowserWindow | null = null
 let settingsWin: BrowserWindow | null = null
+let companionWin: BrowserWindow | null = null
+let pomodoroWin: BrowserWindow | null = null
 
 const TODO_W = 320
 const TODO_H = 380
 const SETTINGS_W = 520
 const SETTINGS_H = 580
+const COMPANION_W = 560
+const COMPANION_H = 640
+const POMODORO_W = 360
+const POMODORO_H = 460
 
 function anchorAboveAvatar(w: number, h: number): { x: number; y: number } {
   const avatar = getAvatarWindow()
@@ -33,6 +39,7 @@ function anchorAboveAvatar(w: number, h: number): { x: number; y: number } {
 export function createTodoWindow(): BrowserWindow {
   if (todoWin && !todoWin.isDestroyed()) {
     todoWin.show()
+    todoWin.moveTop()
     todoWin.focus()
     return todoWin
   }
@@ -57,13 +64,19 @@ export function createTodoWindow(): BrowserWindow {
     }
   })
   todoWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  todoWin.setAlwaysOnTop(true, 'screen-saver')
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     void todoWin.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/todo.html`)
   } else {
     void todoWin.loadFile(path.join(__dirname, '../renderer/todo.html'))
   }
-  todoWin.once('ready-to-show', () => todoWin?.show())
+  todoWin.once('ready-to-show', () => {
+    if (!todoWin) return
+    todoWin.show()
+    todoWin.moveTop()
+    todoWin.focus()
+  })
   todoWin.on('closed', () => {
     todoWin = null
   })
@@ -82,6 +95,7 @@ export function closeTodoWindow(): void {
 export function createSettingsWindow(): BrowserWindow {
   if (settingsWin && !settingsWin.isDestroyed()) {
     settingsWin.show()
+    settingsWin.moveTop()
     settingsWin.focus()
     return settingsWin
   }
@@ -112,7 +126,12 @@ export function createSettingsWindow(): BrowserWindow {
   } else {
     void settingsWin.loadFile(path.join(__dirname, '../renderer/settings.html'))
   }
-  settingsWin.once('ready-to-show', () => settingsWin?.show())
+  settingsWin.once('ready-to-show', () => {
+    if (!settingsWin) return
+    settingsWin.show()
+    settingsWin.moveTop()
+    settingsWin.focus()
+  })
   settingsWin.on('closed', () => {
     settingsWin = null
   })
@@ -126,4 +145,124 @@ export function closeSettingsWindow(): void {
 
 export function getSettingsWindow(): BrowserWindow | null {
   return settingsWin
+}
+
+/**
+ * Companion window — read-only "About / What can Clawd do" panel.
+ * Same chrome as Settings but its own renderer entry.
+ */
+export function createCompanionWindow(): BrowserWindow {
+  if (companionWin && !companionWin.isDestroyed()) {
+    companionWin.show()
+    companionWin.moveTop()
+    companionWin.focus()
+    return companionWin
+  }
+  const display = screen.getPrimaryDisplay()
+  const { width, height } = display.workAreaSize
+  companionWin = new BrowserWindow({
+    width: COMPANION_W,
+    height: COMPANION_H,
+    x: Math.floor((width - COMPANION_W) / 2),
+    y: Math.floor((height - COMPANION_H) / 2),
+    frame: false,
+    transparent: false,
+    backgroundColor: '#0D0D0D',
+    resizable: false,
+    skipTaskbar: false,
+    alwaysOnTop: false,
+    show: false,
+    title: 'Companion',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  })
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    void companionWin.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/companion.html`)
+  } else {
+    void companionWin.loadFile(path.join(__dirname, '../renderer/companion.html'))
+  }
+  companionWin.once('ready-to-show', () => {
+    if (!companionWin) return
+    companionWin.show()
+    companionWin.moveTop()
+    companionWin.focus()
+  })
+  companionWin.on('closed', () => {
+    companionWin = null
+  })
+  return companionWin
+}
+
+export function closeCompanionWindow(): void {
+  if (companionWin && !companionWin.isDestroyed()) companionWin.close()
+  companionWin = null
+}
+
+export function getCompanionWindow(): BrowserWindow | null {
+  return companionWin
+}
+
+/**
+ * Pomodoro window — floating panel anchored above the avatar (similar to
+ * Todo). Shows timer + start/pause/skip controls.
+ */
+export function createPomodoroWindow(): BrowserWindow {
+  if (pomodoroWin && !pomodoroWin.isDestroyed()) {
+    pomodoroWin.show()
+    pomodoroWin.moveTop()
+    pomodoroWin.focus()
+    return pomodoroWin
+  }
+  const { x, y } = anchorAboveAvatar(POMODORO_W, POMODORO_H)
+  pomodoroWin = new BrowserWindow({
+    width: POMODORO_W,
+    height: POMODORO_H,
+    x,
+    y,
+    frame: false,
+    transparent: false,
+    backgroundColor: '#0D0D0D',
+    resizable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    show: false,
+    title: 'Pomodoro',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  })
+  pomodoroWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  pomodoroWin.setAlwaysOnTop(true, 'screen-saver')
+
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    void pomodoroWin.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/pomodoro.html`)
+  } else {
+    void pomodoroWin.loadFile(path.join(__dirname, '../renderer/pomodoro.html'))
+  }
+  pomodoroWin.once('ready-to-show', () => {
+    if (!pomodoroWin) return
+    pomodoroWin.show()
+    pomodoroWin.moveTop()
+    pomodoroWin.focus()
+  })
+  pomodoroWin.on('closed', () => {
+    pomodoroWin = null
+  })
+  return pomodoroWin
+}
+
+export function closePomodoroWindow(): void {
+  if (pomodoroWin && !pomodoroWin.isDestroyed()) pomodoroWin.close()
+  pomodoroWin = null
+}
+
+export function getPomodoroWindow(): BrowserWindow | null {
+  return pomodoroWin
 }

@@ -5,7 +5,7 @@
  * - idle tracker + whisper engine
  * - IPC handlers
  */
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, powerMonitor } from 'electron'
 import logger from './logger'
 import { settingsStore } from './settings'
 import { hasApiKey } from './keychain'
@@ -16,11 +16,11 @@ import {
   closeChatWindow,
   getChatWindow
 } from './chatWindow'
-import { createSettingsWindow } from './secondaryWindows'
+import { createSettingsWindow, createCompanionWindow, createPomodoroWindow } from './secondaryWindows'
 import { applyHotkeyFromSettings, broadcast, registerIpc } from './ipcHandlers'
 import idleTracker from './idleTracker'
 import { fireImmediate, startWhisperEngine, stopWhisperEngine } from './whisperEngine'
-import { startRolloverTicker } from './todoStore'
+import { startRolloverTicker, getDaily, onChange as onTodoChange } from './todoStore'
 import { unregisterAllHotkeys } from './hotkey'
 import { configureAutoUpdater } from './updater'
 import { IPC } from '@shared/ipc'
@@ -118,6 +118,8 @@ async function bootstrap(): Promise<void> {
   createTray({
     onOpenChat: () => openChatWithLifecycle(),
     onOpenSettings: () => createSettingsWindow(),
+    onOpenCompanion: () => createCompanionWindow(),
+    onOpenPomodoro: () => createPomodoroWindow(),
     onQuit: () => app.quit()
   })
 
@@ -132,6 +134,8 @@ async function bootstrap(): Promise<void> {
       import('./secondaryWindows').then((m) => m.createTodoWindow())
     },
     onOpenSettings: () => createSettingsWindow(),
+    onOpenCompanion: () => createCompanionWindow(),
+    onOpenPomodoro: () => createPomodoroWindow(),
     onQuit: () => app.quit(),
     onApplyHotkey: (accel) => {
       applyHotkeyFromSettings(() => {
@@ -173,6 +177,96 @@ async function bootstrap(): Promise<void> {
   // ─── Todo rollover ────────────────────────────────────
   startRolloverTicker()
 
+  // ─── Pet engine (idle-nudge ticker) ───────────────────
+  void import('./pettingEngine').then((m) => m.startPetEngine())
+
+  // ─── Achievements (periodic predicate check) ─────────
+  void import('./achievements').then((m) => m.start())
+
+  // ─── Emote engine (CPU-load watch) ──────────────────
+  void import('./emoteEngine').then((m) => m.start())
+
+  // ─── Wake greetings ──────────────────────────────────
+  // After resuming from sleep, surface a friendly "welcome back" via the
+  // whisper pipeline. Throttled by the OS so spurious resumes won't spam.
+  const WAKE_PHRASES = [
+    'welcome back',
+    'good to see you',
+    'glad you’re back',
+    'i missed you',
+    'ready when you are'
+  ]
+  let lastWakeAt = 0
+  powerMonitor.on('resume', () => {
+    const s = settingsStore().get()
+    if (!s.wakeGreetings) return
+    const now = Date.now()
+    if (now - lastWakeAt < 5 * 60 * 1000) return // 5-minute floor
+    lastWakeAt = now
+    const phrase = WAKE_PHRASES[Math.floor(Math.random() * WAKE_PHRASES.length)] ?? 'hi!'
+    void import('./whisperEngine').then((m) => m.surfaceWhisper(phrase))
+    void import('./sound').then((m) => m.playSound('wake')).catch(() => undefined)
+  })
+
+  // ─── Birthday check ───────────────────────────────────
+  // If today matches the configured birthday: switch to party costume for
+  // the day and surface a one-shot happy-birthday whisper. Runs once at
+  // boot AND every 6 hours after, so a long-running app catches midnight
+  // rollovers without depending on system suspend events.
+  let lastBirthdayKey = ''
+  const checkBirthday = async (): Promise<void> => {
+    const s = settingsStore().get()
+    if (!s.birthday) return
+    const now = new Date()
+    if (now.getMonth() + 1 !== s.birthday.month || now.getDate() !== s.birthday.day) {
+      // If costume was "party" because of a past birthday, leave the user
+      // to clear it manually — we don't undo their costume choice.
+      return
+    }
+    const todayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
+    if (lastBirthdayKey === todayKey) return
+    lastBirthdayKey = todayKey
+    if (s.costume !== 'party') {
+      settingsStore().update({ costume: 'party' })
+    }
+    const mod = await import('./whisperEngine')
+    setTimeout(() => mod.surfaceWhisper('happy birthday! 🎉'), 1500)
+  }
+  void checkBirthday()
+  setInterval(() => void checkBirthday(), 6 * 60 * 60 * 1000)
+
+  // ─── Pomodoro: auto-suggest on first todo of the day ─
+  // We watch todoStore changes; when the count goes from 0 to 1 in a single
+  // calendar day and pomodoro is idle, we surface a one-shot whisper.
+  let lastTodoCount = getDaily().todos.length
+  let suggestedToday = false
+  let suggestedDateKey = new Date().toISOString().slice(0, 10)
+  onTodoChange(() => {
+    void import('./pomodoro').then((pomodoro) => {
+      const todayKey = new Date().toISOString().slice(0, 10)
+      if (todayKey !== suggestedDateKey) {
+        suggestedDateKey = todayKey
+        suggestedToday = false
+      }
+      const count = getDaily().todos.length
+      const settings = settingsStore().get()
+      const grew = count > lastTodoCount && lastTodoCount === 0 && count === 1
+      lastTodoCount = count
+      if (
+        grew &&
+        !suggestedToday &&
+        !pomodoro.isActive() &&
+        settings.pomodoroSuggestOnFirstTodo
+      ) {
+        suggestedToday = true
+        // Reuse the whisper system to surface a friendly nudge.
+        void import('./whisperEngine').then((m) => {
+          m.surfaceWhisper("First todo of the day — want a 25-min focus block? Right-click me → Pomodoro")
+        })
+      }
+    })
+  })
+
   // ─── Whisper engine ───────────────────────────────────
   if (await hasApiKey()) {
     startWhisperIfNeeded()
@@ -190,6 +284,29 @@ async function bootstrap(): Promise<void> {
 }
 
 app.whenReady().then(() => {
+  // Last-resort guard so a transient bug in a tick loop or async tool call
+  // doesn't kill the app with a native error dialog. We log it and stop
+  // fun mode (the most likely culprit because it ticks at 60Hz).
+  process.on('uncaughtException', (err) => {
+    logger.error('Uncaught exception in main', err)
+    void import('./funEngine')
+      .then((m) => {
+        if (m.isActive()) m.stop()
+      })
+      .catch(() => undefined)
+  })
+  process.on('unhandledRejection', (reason) => {
+    logger.error('Unhandled promise rejection in main', reason)
+  })
+
+  // Konami code listener — attached to every BrowserWindow created in the
+  // app. We hook web-contents-created which fires once per window.
+  void import('./konami').then((konami) => {
+    app.on('browser-window-created', (_e, win) => konami.attachToWindow(win))
+    // Also attach to any windows that already exist (avatar bootstraps fast).
+    for (const w of BrowserWindow.getAllWindows()) konami.attachToWindow(w)
+  })
+
   void bootstrap()
 
   app.on('activate', () => {
@@ -209,6 +326,18 @@ app.on('will-quit', () => {
   unregisterAllHotkeys()
   stopWhisperEngine()
   idleTracker.stop()
+  // Stop fun mode if it's running so the tick loop doesn't fight teardown.
+  void import('./funEngine').then((m) => m.stop())
+  // Stop pomodoro tick.
+  void import('./pomodoro').then((m) => m.shutdown())
+  // Stop pet idle-nudge ticker.
+  void import('./pettingEngine').then((m) => m.shutdown())
+  // Reset konami state.
+  void import('./konami').then((m) => m.shutdown())
+  // Achievements ticker.
+  void import('./achievements').then((m) => m.shutdown())
+  // Emote engine.
+  void import('./emoteEngine').then((m) => m.shutdown())
   if (apiKeyWatchInterval) {
     clearInterval(apiKeyWatchInterval)
     apiKeyWatchInterval = null

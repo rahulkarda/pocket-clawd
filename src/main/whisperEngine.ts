@@ -123,6 +123,16 @@ export async function fireImmediate(): Promise<void> {
 }
 
 /**
+ * Surface a literal whisper text immediately (skips Claude generation).
+ * Used by the pomodoro engine for phase-transition messages so they don't
+ * burn API tokens and can include exact phrasing.
+ */
+export function surfaceWhisper(text: string): void {
+  if (!text) return
+  if (onWhisperFn) onWhisperFn(text)
+}
+
+/**
  * Generate a contextual hover suggestion — short one-liner triggered when
  * the user hovers over the avatar. Distinct from periodic whispers in tone:
  *   - more concrete (references current todos / time of day directly)

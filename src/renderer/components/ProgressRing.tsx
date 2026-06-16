@@ -10,6 +10,11 @@ export function ProgressRing({ ratio, size, color }: Props): JSX.Element {
   const radius = size / 2 - stroke
   const c = 2 * Math.PI * radius
   const offset = c * (1 - ratio)
+  // Backplate: a soft, translucent white disc behind the ring + avatar.
+  // - On light backgrounds: nearly invisible, layout untouched
+  // - On dark backgrounds: gives the ring something to contrast against
+  //   so the progress arc is legible against a dark menu bar / wallpaper
+  const plateRadius = radius + stroke / 2
   return (
     <svg
       className="absolute inset-0 pointer-events-none"
@@ -17,11 +22,18 @@ export function ProgressRing({ ratio, size, color }: Props): JSX.Element {
       height={size}
       viewBox={`0 0 ${size} ${size}`}
     >
+      {/* Backplate (visible on dark, washed out on light) */}
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={plateRadius}
+        fill="rgba(245,245,245,0.16)"
+      />
       <circle
         cx={size / 2}
         cy={size / 2}
         r={radius}
-        stroke="#2A2A2A"
+        stroke="rgba(180,180,180,0.55)"
         strokeWidth={stroke}
         fill="none"
       />

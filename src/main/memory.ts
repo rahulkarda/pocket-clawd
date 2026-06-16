@@ -94,8 +94,13 @@ async function ensureRoot(): Promise<void> {
   await fs.mkdir(memoryRoot(), { recursive: true })
 }
 
-async function getTotalSize(): Promise<number> {
+/**
+ * Walk the memory tree and return total bytes + file count. Surfaced via
+ * `getMemoryStats()` for the Companion window.
+ */
+async function walkStats(): Promise<{ totalBytes: number; fileCount: number }> {
   let total = 0
+  let count = 0
   async function walk(dir: string): Promise<void> {
     let entries: import('fs').Dirent[]
     try {
@@ -110,6 +115,7 @@ async function getTotalSize(): Promise<number> {
         try {
           const st = await fs.stat(p)
           total += st.size
+          count += 1
         } catch {
           // ignore
         }
@@ -117,7 +123,20 @@ async function getTotalSize(): Promise<number> {
     }
   }
   await walk(memoryRoot())
-  return total
+  return { totalBytes: total, fileCount: count }
+}
+
+async function getTotalSize(): Promise<number> {
+  return (await walkStats()).totalBytes
+}
+
+export async function getMemoryStats(): Promise<{
+  root: string
+  totalBytes: number
+  fileCount: number
+}> {
+  const stats = await walkStats()
+  return { root: memoryRoot(), ...stats }
 }
 
 /**

@@ -19,6 +19,14 @@ input, textarea {
   -webkit-user-select: text;
 }
 
+/* Anything tagged .selectable lets the user highlight + copy text — used in
+   chat bubbles so transcripts can be copied to the clipboard. */
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
 /* Scrollbar (chat) */
 .scrollbar::-webkit-scrollbar { width: 6px; }
 .scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -43,4 +51,12 @@ input, textarea {
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
+}
+
+/* Rave mode — hue rotation for the whole avatar slot. Activated by
+   adding the inline `animation: clawd-rave …` to a wrapper. */
+@keyframes clawd-rave {
+  0%   { filter: hue-rotate(0deg)   saturate(1.4); }
+  50%  { filter: hue-rotate(180deg) saturate(1.6); }
+  100% { filter: hue-rotate(360deg) saturate(1.4); }
 }

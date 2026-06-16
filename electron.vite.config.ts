@@ -37,7 +37,9 @@ export default defineConfig({
           chat: resolve('src/renderer/chat.html'),
           avatar: resolve('src/renderer/avatar.html'),
           todo: resolve('src/renderer/todo.html'),
-          settings: resolve('src/renderer/settings.html')
+          settings: resolve('src/renderer/settings.html'),
+          companion: resolve('src/renderer/companion.html'),
+          pomodoro: resolve('src/renderer/pomodoro.html')
         }
       }
     }

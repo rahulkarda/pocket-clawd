@@ -31,6 +31,7 @@
     "dev": "ELECTRON_RUN_AS_NODE= electron-vite dev",
     "build": "electron-vite build",
     "build:icons": "node scripts/build-icons.cjs",
+    "build:app-icon": "node scripts/build-app-icon.cjs",
     "start": "ELECTRON_RUN_AS_NODE= electron-vite preview",
     "package": "npm run build && ELECTRON_RUN_AS_NODE= electron-builder --mac --dir",
     "dist": "npm run build && ELECTRON_RUN_AS_NODE= electron-builder --mac",

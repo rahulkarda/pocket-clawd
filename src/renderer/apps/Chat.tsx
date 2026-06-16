@@ -85,6 +85,30 @@ export function ChatApp(): JSX.Element {
     setError(null)
     void window.api.app.registerActivity()
 
+    // Slash commands — handled locally, no LLM call. We append the user's
+    // text to the transcript (so it reads naturally), then a synthesized
+    // assistant ack so the user sees confirmation. Unknown slash commands
+    // fall through to the normal LLM path, in case the user wanted to ask
+    // about a slash literally.
+    const cmd = handleSlashCommand(trimmed)
+    if (cmd) {
+      const userMsg: ChatMessage = {
+        id: nanoid(),
+        role: 'user',
+        content: trimmed,
+        ts: new Date().toISOString()
+      }
+      const ackMsg: ChatMessage = {
+        id: nanoid(),
+        role: 'assistant',
+        content: cmd.ack,
+        ts: new Date().toISOString()
+      }
+      setMessages([...messages, userMsg, ackMsg])
+      void cmd.run()
+      return
+    }
+
     const userMsg: ChatMessage = {
       id: nanoid(),
       role: 'user',
@@ -156,7 +180,14 @@ export function ChatApp(): JSX.Element {
       animate={{ scale: 1, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 260, damping: 22 }}
     >
-      <Header onClose={close} />
+      <Header
+        onClose={close}
+        onCopyAll={() =>
+          messages
+            .map((m) => `${m.role === 'assistant' ? 'Clawd' : 'You'}: ${m.content}`)
+            .join('\n\n')
+        }
+      />
       {carryFwd.length > 0 ? (
         <CarryForwardPrompt todos={carryFwd} onResolve={resolveCarryForward} />
       ) : (
@@ -165,4 +196,122 @@ export function ChatApp(): JSX.Element {
       {carryFwd.length === 0 && <InputBar disabled={streaming} onSend={(t) => send(t)} />}
     </motion.div>
   )
+}
+
+/**
+ * Slash command resolver. Returns null if the input is not a known slash
+ * command (the caller should pass through to the LLM normally). Returns
+ * { ack, run } otherwise: `ack` is the text rendered as Clawd's response
+ * in the transcript; `run` performs the side-effect (open window, fire
+ * event, etc).
+ *
+ * Commands intentionally do NOT call the LLM — they're meant to be free
+ * shortcuts so users can keep their hands on the keyboard.
+ */
+function handleSlashCommand(input: string): { ack: string; run: () => void | Promise<void> } | null {
+  const m = input.match(/^\/(\w[\w-]*)\s*(.*)$/)
+  if (!m) return null
+  const [, name, args] = m
+  const arg = (args ?? '').trim()
+  switch (name.toLowerCase()) {
+    case 'todo':
+    case 'todos':
+      return {
+        ack: 'Opening your todo list…',
+        run: () => window.api.todoWindow.open()
+      }
+    case 'tools':
+    case 'companion':
+    case 'about':
+      return {
+        ack: 'Opening the Companion window — it lists every tool, mode, and shortcut.',
+        run: () => window.api.companionWindow.open()
+      }
+    case 'pomodoro':
+    case 'pomo':
+    case 'focus':
+      return {
+        ack: 'Opening the Pomodoro timer.',
+        run: () => window.api.pomodoroWindow.open()
+      }
+    case 'pet':
+      return {
+        ack: '🌸 nice.',
+        run: async () => {
+          await window.api.petting.register()
+        }
+      }
+    case 'snack':
+    case 'feed':
+      return {
+        ack: 'nom nom nom… 🥬',
+        run: async () => {
+          await window.api.snack.give()
+        }
+      }
+    case 'fetch':
+    case 'play':
+      return {
+        ack: 'Throwing the ball! Clawd will romp for 60 seconds.',
+        run: async () => {
+          await window.api.avatar.funFetch()
+        }
+      }
+    case 'fun':
+      return {
+        ack: 'Fun mode toggled. Click Clawd to stop.',
+        run: async () => {
+          await window.api.avatar.funToggle()
+        }
+      }
+    case 'settings':
+    case 'preferences':
+      return {
+        ack: 'Opening Settings.',
+        run: () => window.api.settingsWindow.open()
+      }
+    case 'costume':
+    case 'outfit': {
+      const allowed = new Set(['none', 'santa', 'shades', 'party', 'witch'])
+      if (allowed.has(arg)) {
+        return {
+          ack: `Costume → ${arg}.`,
+          run: async () => {
+            await window.api.settings.update({ costume: arg as 'none' | 'santa' | 'shades' | 'party' | 'witch' })
+          }
+        }
+      }
+      return {
+        ack: 'Pick one of: none, santa, shades, party, witch. Try `/costume party`.',
+        run: () => undefined
+      }
+    }
+    case 'help':
+    case 'commands':
+    case '?':
+      return {
+        ack: [
+          'Available commands:',
+          '  /todo      — open the todo list',
+          '  /tools     — open Companion (what Clawd can do)',
+          '  /pomodoro  — open the focus timer',
+          '  /pet       — pet Clawd',
+          '  /snack     — give Clawd a snack',
+          '  /fetch     — play fetch (60s)',
+          '  /fun       — toggle fun mode',
+          '  /costume X — change costume (none, santa, shades, party, witch)',
+          '  /settings  — open Settings',
+          '  /quit      — quit Pocket Clawd'
+        ].join('\n'),
+        run: () => undefined
+      }
+    case 'quit':
+    case 'exit':
+      return {
+        ack: 'See you soon. 🌸',
+        run: () => window.api.app.quit()
+      }
+    default:
+      return null
+  }
 }

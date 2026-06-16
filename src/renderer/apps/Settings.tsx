@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { DEFAULT_SETTINGS, type AppSettings } from '@shared/types'
+import { DEFAULT_SETTINGS, type AppSettings, type UpdaterStatus } from '@shared/types'
 
 const MODELS = [
   { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (recommended)' },
@@ -15,6 +15,24 @@ export function SettingsApp(): JSX.Element {
   const [savedFlash, setSavedFlash] = useState<string | null>(null)
   const [loginItemMismatch, setLoginItemMismatch] = useState(false)
   const [clearingMemory, setClearingMemory] = useState(false)
+  const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus>({ state: 'idle' })
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+
+  // Subscribe to updater status broadcasts and prime with last-known.
+  useEffect(() => {
+    void window.api.updater.getLast().then(setUpdaterStatus)
+    return window.api.updater.onStatus(setUpdaterStatus)
+  }, [])
+
+  const checkForUpdates = async (): Promise<void> => {
+    setCheckingUpdate(true)
+    try {
+      const status = await window.api.updater.checkNow()
+      setUpdaterStatus(status)
+    } finally {
+      setCheckingUpdate(false)
+    }
+  }
 
   // Compare what the user wants (settings.openAtLogin) with what macOS
   // actually has registered. Unsigned apps fail setLoginItemSettings
@@ -279,6 +297,11 @@ export function SettingsApp(): JSX.Element {
             value={settings.showOnAllSpaces}
             onChange={(v) => update({ showOnAllSpaces: v })}
           />
+          <Toggle
+            label="Greet me when my Mac wakes up"
+            value={settings.wakeGreetings}
+            onChange={(v) => update({ wakeGreetings: v })}
+          />
         </Section>
 
         <Section
@@ -312,6 +335,76 @@ export function SettingsApp(): JSX.Element {
               </button>
             </div>
           )}
+        </Section>
+
+        <Section
+          title="Sounds"
+          hint="Synthesized cues for petting, snacks, pomodoro transitions, and more."
+        >
+          <Toggle
+            label="Mute all sounds"
+            value={settings.mute}
+            onChange={(v) => update({ mute: v })}
+          />
+          <div className="flex items-center gap-3 mt-2">
+            <span className="text-[11px] text-textMeta w-14">Volume</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={settings.volume}
+              onChange={(e) =>
+                setSettings((s) => ({ ...s, volume: Number(e.target.value) }))
+              }
+              onMouseUp={() => update({ volume: settings.volume })}
+              disabled={settings.mute}
+              className="flex-1 accent-accent"
+            />
+            <span className="text-xs text-textMeta w-10 text-right">
+              {Math.round(settings.volume * 100)}%
+            </span>
+          </div>
+        </Section>
+
+        <Section
+          title="Pomodoro"
+          hint="Classic 25/5/15. Right-click Clawd → Pomodoro to open the timer."
+        >
+          <div className="space-y-2">
+            <PomodoroDurations settings={settings} update={update} />
+            <Toggle
+              label="Auto-start the next phase"
+              value={settings.pomodoroAutoStartNext}
+              onChange={(v) => update({ pomodoroAutoStartNext: v })}
+            />
+            <Toggle
+              label="Notify on phase transitions"
+              value={settings.pomodoroNotify}
+              onChange={(v) => update({ pomodoroNotify: v })}
+            />
+            <Toggle
+              label="Suggest a focus block on the first todo of the day"
+              value={settings.pomodoroSuggestOnFirstTodo}
+              onChange={(v) => update({ pomodoroSuggestOnFirstTodo: v })}
+            />
+          </div>
+        </Section>
+
+        <Section
+          title="Birthday"
+          hint="Optional. On your birthday Clawd wears a party hat and wishes you happy birthday on launch."
+        >
+          <BirthdayInput settings={settings} update={update} />
+        </Section>
+
+        <Section title="Updates" hint="Check GitHub Releases for newer builds.">
+          <UpdaterPanel
+            status={updaterStatus}
+            checking={checkingUpdate}
+            onCheck={checkForUpdates}
+            onInstall={() => void window.api.updater.quitAndInstall()}
+          />
         </Section>
 
         <Section title="Persona / system context" hint="Injected into the chat system prompt.">
@@ -376,5 +469,247 @@ function Toggle({
         />
       </button>
     </label>
+  )
+}
+
+/**
+ * Updater status display + manual check button + restart-to-install button.
+ * The status state machine maps directly to electron-updater's events:
+ * idle → checking → (available → downloading → downloaded) | not-available | error
+ */
+function UpdaterPanel({
+  status,
+  checking,
+  onCheck,
+  onInstall
+}: {
+  status: UpdaterStatus
+  checking: boolean
+  onCheck: () => void
+  onInstall: () => void
+}): JSX.Element {
+  let line = 'Up to date.'
+  let tone = 'text-textMeta'
+  switch (status.state) {
+    case 'idle':
+      line = 'No checks yet — click below to check now.'
+      break
+    case 'checking':
+      line = 'Checking for updates…'
+      break
+    case 'not-available':
+      line = `You're up to date${status.version ? ` (v${status.version})` : ''}.`
+      tone = 'text-success'
+      break
+    case 'available':
+      line = `Update available: v${status.version} — preparing download…`
+      tone = 'text-accent'
+      break
+    case 'downloading':
+      line = `Downloading… ${status.progress ?? 0}%`
+      tone = 'text-accent'
+      break
+    case 'downloaded':
+      line = `v${status.version} ready — restart to install.`
+      tone = 'text-success'
+      break
+    case 'error':
+      line = `Update check failed: ${status.message ?? 'unknown error'}`
+      tone = 'text-red-400'
+      break
+  }
+  return (
+    <div className="space-y-2">
+      <div className={`text-[11px] ${tone}`}>{line}</div>
+      <div className="flex gap-2">
+        <button
+          onClick={onCheck}
+          disabled={checking || status.state === 'downloading'}
+          className="px-3 py-1.5 rounded-lg bg-bubble-user text-textMain text-xs hover:bg-bubble-user/80 disabled:opacity-50"
+        >
+          {checking ? 'Checking…' : 'Check for updates'}
+        </button>
+        {status.state === 'downloaded' && (
+          <button
+            onClick={onInstall}
+            className="px-3 py-1.5 rounded-lg bg-accent text-white text-xs hover:bg-accent/90"
+          >
+            Restart and install
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Three-up duration pickers for the Pomodoro work / short / long blocks +
+ * cycles-before-long-break stepper. Numbers persist on blur, not on every
+ * keystroke, so partial input doesn't flood updates.
+ */
+function PomodoroDurations({
+  settings,
+  update
+}: {
+  settings: AppSettings
+  update: (patch: Partial<AppSettings>) => Promise<void>
+}): JSX.Element {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <DurationInput
+        label="Focus (min)"
+        value={settings.pomodoroWorkMin}
+        min={1}
+        max={180}
+        onCommit={(n) => update({ pomodoroWorkMin: n })}
+      />
+      <DurationInput
+        label="Short break (min)"
+        value={settings.pomodoroShortBreakMin}
+        min={1}
+        max={60}
+        onCommit={(n) => update({ pomodoroShortBreakMin: n })}
+      />
+      <DurationInput
+        label="Long break (min)"
+        value={settings.pomodoroLongBreakMin}
+        min={1}
+        max={120}
+        onCommit={(n) => update({ pomodoroLongBreakMin: n })}
+      />
+      <DurationInput
+        label="Cycles before long"
+        value={settings.pomodoroCyclesBeforeLongBreak}
+        min={1}
+        max={12}
+        onCommit={(n) => update({ pomodoroCyclesBeforeLongBreak: n })}
+      />
+    </div>
+  )
+}
+
+function DurationInput({
+  label,
+  value,
+  min,
+  max,
+  onCommit
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  onCommit: (n: number) => void
+}): JSX.Element {
+  const [draft, setDraft] = useState(String(value))
+  // Reflect external changes (e.g. settings reload) into the draft.
+  useEffect(() => {
+    setDraft(String(value))
+  }, [value])
+  const commit = (): void => {
+    const n = Number(draft)
+    if (!Number.isFinite(n)) {
+      setDraft(String(value))
+      return
+    }
+    const clamped = Math.max(min, Math.min(max, Math.round(n)))
+    setDraft(String(clamped))
+    if (clamped !== value) onCommit(clamped)
+  }
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[10px] text-textMeta">{label}</span>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+        }}
+        className="bg-bg/80 border border-white/10 text-textMain text-xs rounded-lg px-2 py-1.5 outline-none focus:ring-1 focus:ring-accent/40"
+      />
+    </label>
+  )
+}
+
+/**
+ * Birthday picker — two number inputs for month + day, plus a "clear"
+ * button. Persists null when empty so the engine treats it as opt-out.
+ */
+function BirthdayInput({
+  settings,
+  update
+}: {
+  settings: AppSettings
+  update: (patch: Partial<AppSettings>) => Promise<void>
+}): JSX.Element {
+  const [month, setMonth] = useState<string>(
+    settings.birthday ? String(settings.birthday.month) : ''
+  )
+  const [day, setDay] = useState<string>(
+    settings.birthday ? String(settings.birthday.day) : ''
+  )
+  useEffect(() => {
+    setMonth(settings.birthday ? String(settings.birthday.month) : '')
+    setDay(settings.birthday ? String(settings.birthday.day) : '')
+  }, [settings.birthday])
+
+  const commit = (): void => {
+    const m = Number(month)
+    const d = Number(day)
+    if (!Number.isFinite(m) || !Number.isFinite(d) || month === '' || day === '') {
+      void update({ birthday: null })
+      return
+    }
+    void update({
+      birthday: { month: Math.max(1, Math.min(12, Math.round(m))), day: Math.max(1, Math.min(31, Math.round(d))) }
+    })
+  }
+
+  return (
+    <div className="flex items-end gap-2">
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] text-textMeta">Month</span>
+        <input
+          type="number"
+          min={1}
+          max={12}
+          value={month}
+          placeholder="MM"
+          onChange={(e) => setMonth(e.target.value)}
+          onBlur={commit}
+          className="w-20 bg-bg/80 border border-white/10 text-textMain text-xs rounded-lg px-2 py-1.5 outline-none"
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] text-textMeta">Day</span>
+        <input
+          type="number"
+          min={1}
+          max={31}
+          value={day}
+          placeholder="DD"
+          onChange={(e) => setDay(e.target.value)}
+          onBlur={commit}
+          className="w-20 bg-bg/80 border border-white/10 text-textMain text-xs rounded-lg px-2 py-1.5 outline-none"
+        />
+      </label>
+      {settings.birthday && (
+        <button
+          type="button"
+          onClick={() => {
+            setMonth('')
+            setDay('')
+            void update({ birthday: null })
+          }}
+          className="px-2 py-1.5 rounded-lg bg-bg/60 border border-white/10 text-textMeta text-[10px] hover:text-textMain"
+        >
+          Clear
+        </button>
+      )}
+    </div>
   )
 }

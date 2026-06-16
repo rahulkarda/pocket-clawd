@@ -70,8 +70,22 @@ export function configureAutoUpdater(): void {
     broadcast({ state: 'downloaded', version: info.version })
   })
   autoUpdater.on('error', (err) => {
+    const msg = err?.message ?? String(err)
+    // Local `--dir` builds don't ship `app-update.yml`. The autoUpdater
+    // throws ENOENT on every check, which would otherwise surface as a
+    // scary red message in Settings on every launch. Demote to a quiet
+    // "not-available" so the user isn't alarmed by a benign packaging
+    // detail. Real errors (network, parse, signature) still propagate.
+    if (/app-update\.yml/.test(msg) && /ENOENT/.test(msg)) {
+      logger.info('autoUpdater: app-update.yml missing (local --dir build); skipping')
+      broadcast({
+        state: 'not-available',
+        message: 'Update metadata not present in this build.'
+      })
+      return
+    }
     logger.error('autoUpdater error', err)
-    broadcast({ state: 'error', message: err.message })
+    broadcast({ state: 'error', message: msg })
   })
 
   // First check: 30s after launch, so it doesn't compete with the rest of
@@ -92,7 +106,19 @@ export async function checkForUpdatesNow(): Promise<UpdaterStatus> {
   try {
     await autoUpdater.checkForUpdates()
   } catch (err) {
-    return { state: 'error', message: (err as Error).message }
+    const msg = (err as Error).message ?? String(err)
+    // `app-update.yml` is generated only by full electron-builder runs
+    // (`--mac` + publish). Local `--dir` packages are missing this file,
+    // so the auto-updater throws ENOENT on every check. Convert that
+    // specific case into a friendlier "not-available" state so the
+    // Settings panel doesn't show a scary red error for a benign cause.
+    if (/app-update\.yml/.test(msg) && /ENOENT/.test(msg)) {
+      return {
+        state: 'not-available',
+        message: 'This build was not produced by the release pipeline, so update metadata is missing. Future official builds will check normally.'
+      }
+    }
+    return { state: 'error', message: msg }
   }
   return lastStatus
 }

@@ -3,8 +3,9 @@
  * Wraps electron-store, resolves the default output dir at runtime.
  */
 import Store from 'electron-store'
-import { app } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import path from 'path'
+import { IPC } from '@shared/ipc'
 import { DEFAULT_SETTINGS, type AppSettings } from '@shared/types'
 
 class SettingsStore {
@@ -24,9 +25,16 @@ class SettingsStore {
     return this.store.store
   }
 
+  /**
+   * Persist a settings patch and broadcast SETTINGS_CHANGED to every
+   * renderer so live UI (Avatar costume, etc.) updates without a poll.
+   */
   update(patch: Partial<AppSettings>): AppSettings {
     const next = { ...this.store.store, ...patch }
     this.store.store = next
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed()) w.webContents.send(IPC.SETTINGS_CHANGED, next)
+    }
     return next
   }
 

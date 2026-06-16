@@ -5,12 +5,26 @@
  * the preload sources.
  */
 import type {
+  Achievement,
+  AchievementsState,
   AppSettings,
   AvatarAnimState,
+  AvatarLayout,
   ChatMessage,
   ChatStreamEvent,
+  CollectionState,
   DailyTodoStore,
+  FunFrame,
+  MemoryInfo,
+  PetEvent,
+  PetStats,
+  PomodoroPhase,
+  PomodoroStatus,
+  PomodoroStreakState,
+  SnackEvent,
+  SnackStats,
   Todo,
+  ToolDescriptor,
   UpdaterStatus,
   WhisperEvent
 } from '@shared/types'
@@ -29,6 +43,7 @@ declare global {
         openLoginItemsPane: () => Promise<void>
         clearMemory: () => Promise<void>
         openMemoryDir: () => Promise<void>
+        onChanged: (cb: (s: AppSettings) => void) => () => void
       }
       chat: {
         open: () => Promise<void>
@@ -43,6 +58,15 @@ declare global {
       settingsWindow: {
         open: () => Promise<void>
         close: () => Promise<void>
+      }
+      companionWindow: {
+        open: () => Promise<void>
+        close: () => Promise<void>
+      }
+      companion: {
+        getToolset: () => Promise<ToolDescriptor[]>
+        getMemoryInfo: () => Promise<MemoryInfo>
+        getAppVersion: () => Promise<string>
       }
       todos: {
         list: () => Promise<DailyTodoStore>
@@ -62,6 +86,16 @@ declare global {
         hoverSuggest: () => Promise<string | null>
         onAnimState: (cb: (s: AvatarAnimState) => void) => () => void
         onWhisper: (cb: (w: WhisperEvent) => void) => () => void
+        onLayout: (cb: (l: AvatarLayout) => void) => () => void
+        getLayout: () => Promise<AvatarLayout | null>
+        funToggle: () => Promise<boolean>
+        funFetch: () => Promise<boolean>
+        onFunFrame: (cb: (f: FunFrame) => void) => () => void
+        onFunState: (cb: (state: { active: boolean; fetching: boolean }) => void) => () => void
+        onRaveState: (cb: (active: boolean) => void) => () => void
+        onGaze: (cb: (direction: 'left' | 'right' | 'none') => void) => () => void
+        onEmote: (cb: (e: { emoji: string; durationMs: number }) => void) => () => void
+        onPlaySound: (cb: (name: string) => void) => () => void
       }
       app: {
         quit: () => Promise<void>
@@ -72,6 +106,42 @@ declare global {
         getLast: () => Promise<UpdaterStatus>
         quitAndInstall: () => Promise<void>
         onStatus: (cb: (s: UpdaterStatus) => void) => () => void
+      }
+      pomodoroWindow: {
+        open: () => Promise<void>
+        close: () => Promise<void>
+      }
+      pomodoro: {
+        getStatus: () => Promise<PomodoroStatus>
+        start: (taskLabel?: string, phase?: PomodoroPhase) => Promise<PomodoroStatus>
+        pause: () => Promise<PomodoroStatus>
+        resume: () => Promise<PomodoroStatus>
+        reset: () => Promise<PomodoroStatus>
+        skip: () => Promise<PomodoroStatus>
+        onStatus: (cb: (s: PomodoroStatus) => void) => () => void
+      }
+      petting: {
+        register: () => Promise<PetEvent>
+        getStats: () => Promise<PetStats>
+        onEvent: (cb: (e: PetEvent) => void) => () => void
+      }
+      snack: {
+        give: () => Promise<SnackEvent | null>
+        getStats: () => Promise<SnackStats>
+        onEvent: (cb: (e: SnackEvent) => void) => () => void
+      }
+      collection: {
+        get: () => Promise<CollectionState>
+        onEvent: (cb: (s: CollectionState) => void) => () => void
+      }
+      achievements: {
+        getCatalog: () => Promise<Achievement[]>
+        getEarned: () => Promise<AchievementsState>
+        onEvent: (cb: (s: AchievementsState) => void) => () => void
+      }
+      pomodoroStreak: {
+        get: () => Promise<PomodoroStreakState>
+        onState: (cb: (s: PomodoroStreakState) => void) => () => void
       }
     }
   }

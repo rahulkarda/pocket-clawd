@@ -4,6 +4,7 @@
 import { BrowserWindow, screen } from 'electron'
 import path from 'path'
 import { getAvatarWindow } from './avatarWindow'
+import { IPC } from '@shared/ipc'
 
 let win: BrowserWindow | null = null
 
@@ -71,14 +72,38 @@ export function createChatWindow(): BrowserWindow {
     if (!win) return
     win.show()
     win.focus()
+    // Tell the avatar to glance toward the chat window. Direction is based
+    // on the chat's screen-X relative to the avatar's screen-X.
+    const avatar = getAvatarWindow()
+    if (avatar && !avatar.isDestroyed()) {
+      const [ax] = avatar.getPosition()
+      const [aw] = avatar.getSize()
+      const [cx] = win.getPosition()
+      const [cw] = win.getSize()
+      const avatarMid = ax + aw / 2
+      const chatMid = cx + cw / 2
+      const dir = chatMid > avatarMid ? 'right' : 'left'
+      avatar.webContents.send(IPC.AVATAR_GAZE, { direction: dir })
+    }
   })
 
   win.on('blur', () => {
     // Stay open on blur — the panel is alwaysOnTop and explicit close.
   })
 
-  win.on('closed', () => {
-    win = null
+  // Capture this BrowserWindow in a local so the 'closed' handler doesn't
+  // clobber a *different* freshly-created chat window if the user closes
+  // and re-opens chat in quick succession (Electron fires 'closed'
+  // asynchronously after createChatWindow returns and may overlap a
+  // reopen call that has already replaced module-scoped `win`).
+  const thisWin = win
+  thisWin.on('closed', () => {
+    if (win === thisWin) win = null
+    // Clear the gaze when chat closes.
+    const avatar = getAvatarWindow()
+    if (avatar && !avatar.isDestroyed()) {
+      avatar.webContents.send(IPC.AVATAR_GAZE, { direction: 'none' })
+    }
   })
 
   return win
