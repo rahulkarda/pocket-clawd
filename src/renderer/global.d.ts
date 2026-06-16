@@ -11,6 +11,7 @@ import type {
   ChatStreamEvent,
   DailyTodoStore,
   Todo,
+  UpdaterStatus,
   WhisperEvent
 } from '@shared/types'
 
@@ -58,12 +59,19 @@ declare global {
         dragStart: (x: number, y: number) => Promise<void>
         dragTo: (x: number, y: number) => Promise<void>
         dragEnd: () => Promise<void>
+        hoverSuggest: () => Promise<string | null>
         onAnimState: (cb: (s: AvatarAnimState) => void) => () => void
         onWhisper: (cb: (w: WhisperEvent) => void) => () => void
       }
       app: {
         quit: () => Promise<void>
         registerActivity: () => Promise<void>
+      }
+      updater: {
+        checkNow: () => Promise<UpdaterStatus>
+        getLast: () => Promise<UpdaterStatus>
+        quitAndInstall: () => Promise<void>
+        onStatus: (cb: (s: UpdaterStatus) => void) => () => void
       }
     }
   }

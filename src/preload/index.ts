@@ -11,6 +11,7 @@ import type {
   ChatStreamEvent,
   DailyTodoStore,
   Todo,
+  UpdaterStatus,
   WhisperEvent
 } from '@shared/types'
 
@@ -80,6 +81,7 @@ const api = {
     dragTo: (x: number, y: number): Promise<void> =>
       ipcRenderer.invoke(IPC.AVATAR_DRAG_TO, x, y),
     dragEnd: (): Promise<void> => ipcRenderer.invoke(IPC.AVATAR_DRAG_END),
+    hoverSuggest: (): Promise<string | null> => ipcRenderer.invoke(IPC.AVATAR_HOVER_SUGGEST),
     onAnimState: (cb: (s: AvatarAnimState) => void): (() => void) => {
       const listener = (_e: unknown, s: AvatarAnimState): void => cb(s)
       ipcRenderer.on(IPC.AVATAR_ANIM_STATE, listener)
@@ -96,6 +98,18 @@ const api = {
   app: {
     quit: (): Promise<void> => ipcRenderer.invoke(IPC.APP_QUIT),
     registerActivity: (): Promise<void> => ipcRenderer.invoke(IPC.APP_REGISTER_ACTIVITY)
+  },
+
+  // ─── Auto-update ────────────────────────────────────
+  updater: {
+    checkNow: (): Promise<UpdaterStatus> => ipcRenderer.invoke(IPC.UPDATE_CHECK_NOW),
+    getLast: (): Promise<UpdaterStatus> => ipcRenderer.invoke(IPC.UPDATE_GET_LAST),
+    quitAndInstall: (): Promise<void> => ipcRenderer.invoke(IPC.UPDATE_QUIT_AND_INSTALL),
+    onStatus: (cb: (s: UpdaterStatus) => void): (() => void) => {
+      const listener = (_e: unknown, s: UpdaterStatus): void => cb(s)
+      ipcRenderer.on(IPC.UPDATE_STATUS, listener)
+      return () => ipcRenderer.off(IPC.UPDATE_STATUS, listener)
+    }
   }
 }
 

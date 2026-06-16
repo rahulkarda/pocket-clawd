@@ -45,11 +45,18 @@ export const IPC = {
   AVATAR_ANIM_STATE: 'avatar:anim-state', // broadcast
   AVATAR_WHISPER: 'avatar:whisper', // broadcast
   AVATAR_CONTEXT_MENU: 'avatar:context-menu',
+  AVATAR_HOVER_SUGGEST: 'avatar:hover-suggest',
 
   // ─── App ────────────────────────────────────────────
   APP_QUIT: 'app:quit',
   APP_OPEN_LAST_SPEC: 'app:open-last-spec',
-  APP_REGISTER_ACTIVITY: 'app:register-activity'
+  APP_REGISTER_ACTIVITY: 'app:register-activity',
+
+  // ─── Auto-update ────────────────────────────────────
+  UPDATE_STATUS: 'update:status', // broadcast
+  UPDATE_CHECK_NOW: 'update:check-now',
+  UPDATE_GET_LAST: 'update:get-last',
+  UPDATE_QUIT_AND_INSTALL: 'update:quit-and-install'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

@@ -183,6 +183,55 @@ export function Avatar(): JSX.Element {
     }
   }
 
+  /**
+   * Hover suggestion. After ~700ms of mouse-over (no movement, no chat
+   * window already open), fire a contextual one-liner via main → Claude.
+   * The suggestion shows in the same whisper-tooltip slot. We rate-limit
+   * to once per 60s to avoid burning the API on idle hovers.
+   */
+  const hoverTimerRef = useRef<number | null>(null)
+  const lastHoverFireRef = useRef<number>(0)
+  const HOVER_DELAY_MS = 700
+  const HOVER_COOLDOWN_MS = 60_000
+
+  const onMouseEnter = (): void => {
+    if (hoverTimerRef.current !== null) {
+      window.clearTimeout(hoverTimerRef.current)
+    }
+    hoverTimerRef.current = window.setTimeout(async () => {
+      hoverTimerRef.current = null
+      // Skip if a whisper is already on screen, or we're mid-drag
+      if (whisper || dragRef.current) return
+      // Cooldown gate
+      const now = Date.now()
+      if (now - lastHoverFireRef.current < HOVER_COOLDOWN_MS) return
+      lastHoverFireRef.current = now
+      try {
+        const text = await window.api.avatar.hoverSuggest()
+        if (text && !whisper) {
+          // Reuse the whisper tooltip slot. Clear any previous timer.
+          if (whisperTimerRef.current !== null) {
+            window.clearTimeout(whisperTimerRef.current)
+          }
+          setWhisper({ text, key: Date.now() })
+          whisperTimerRef.current = window.setTimeout(() => {
+            setWhisper(null)
+            whisperTimerRef.current = null
+          }, 5000)
+        }
+      } catch {
+        // Quietly ignore — hover should never disrupt
+      }
+    }, HOVER_DELAY_MS)
+  }
+
+  const onMouseLeave = (): void => {
+    if (hoverTimerRef.current !== null) {
+      window.clearTimeout(hoverTimerRef.current)
+      hoverTimerRef.current = null
+    }
+  }
+
   return (
     <div
       className="w-full h-full relative flex items-center justify-center cursor-grab active:cursor-grabbing"
@@ -190,6 +239,8 @@ export function Avatar(): JSX.Element {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerEnd}
       onPointerCancel={onPointerEnd}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       {/* Glow */}
       <div

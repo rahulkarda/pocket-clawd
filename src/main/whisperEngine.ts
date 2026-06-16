@@ -121,3 +121,59 @@ export async function fireImmediate(): Promise<void> {
   if (text && onWhisperFn) onWhisperFn(text)
   if (timer) scheduleNext()
 }
+
+/**
+ * Generate a contextual hover suggestion — short one-liner triggered when
+ * the user hovers over the avatar. Distinct from periodic whispers in tone:
+ *   - more concrete (references current todos / time of day directly)
+ *   - on-demand only, no caching beyond the standard 24h whisper dedup
+ *   - returns null if no API key, network error, or empty result
+ *
+ * The user's hover is the signal that they want a nudge right now. Compaction
+ * is implicit: we deliberately keep this to a 30-token oneShot so it's snappy.
+ */
+export async function generateHoverSuggestion(): Promise<string | null> {
+  if (!(await hasApiKey())) return null
+  const now = new Date()
+  const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  const slot = getTimeSlot(now)
+  const settings = settingsStore().get()
+
+  // Pull a tiny snapshot of todos so the suggestion can reference them.
+  let todoLine = ''
+  try {
+    const { getDaily } = await import('./todoStore')
+    const d = getDaily()
+    const open = d.todos.filter((t) => !t.done)
+    if (open.length > 0) {
+      todoLine = `\nOpen todos right now: ${open.slice(0, 5).map((t) => `"${t.text}"`).join(', ')}`
+    }
+  } catch {
+    // ignore — suggestion still works without it
+  }
+
+  const system = `Current time: ${hhmm}, time slot: ${timeSlotLabel(slot)}
+User context: ${settings.userContext}${todoLine}
+
+The user is hovering over Clawd's avatar in their menubar. Generate ONE short, contextual suggestion (max 10 words) — a specific nudge or question that reflects what they should focus on right now. If they have open todos, you may pick the most timely one and prompt about it (e.g. "Knock out the eval harness?"). Otherwise reflect the time of day. No emoji. No quotes. Just the raw suggestion text.
+
+Avoid these recent ones:
+${recentWhispers().slice(0, 5).map((r) => `- ${r}`).join('\n') || '(none)'}`
+
+  try {
+    const text = await oneShot({
+      system,
+      user: 'Generate one suggestion now.',
+      maxTokens: 30
+    })
+    const cleaned = text.trim().replace(/^["']|["']$/g, '').replace(/[.!?]+$/, '')
+    if (cleaned) {
+      rememberWhisper(cleaned)
+      return cleaned
+    }
+    return null
+  } catch (err) {
+    logger.warn('Hover suggestion failed', err)
+    return null
+  }
+}

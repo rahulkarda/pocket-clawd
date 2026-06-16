@@ -265,6 +265,27 @@ export function registerIpc(actions: AppActions): void {
   ipcMain.handle(IPC.AVATAR_DRAG_TO, (_e, x: number, y: number) => dragTo(x, y))
   ipcMain.handle(IPC.AVATAR_DRAG_END, () => endDrag())
 
+  /** Hover suggestion: generates a contextual one-liner via Claude.
+   *  Returns string | null (null if no API key, error, or empty). */
+  ipcMain.handle(IPC.AVATAR_HOVER_SUGGEST, async () => {
+    const { generateHoverSuggestion } = await import('./whisperEngine')
+    return await generateHoverSuggestion()
+  })
+
+  // ─── Auto-update ────────────────────────────────────
+  ipcMain.handle(IPC.UPDATE_CHECK_NOW, async () => {
+    const { checkForUpdatesNow } = await import('./updater')
+    return await checkForUpdatesNow()
+  })
+  ipcMain.handle(IPC.UPDATE_GET_LAST, async () => {
+    const { getLastUpdaterStatus } = await import('./updater')
+    return getLastUpdaterStatus()
+  })
+  ipcMain.handle(IPC.UPDATE_QUIT_AND_INSTALL, async () => {
+    const { quitAndInstall } = await import('./updater')
+    quitAndInstall()
+  })
+
   // ─── App ────────────────────────────────────────────
   ipcMain.handle(IPC.APP_QUIT, () => app.quit())
   ipcMain.handle(IPC.APP_REGISTER_ACTIVITY, () => idleTracker.registerActivity())

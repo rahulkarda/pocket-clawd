@@ -274,6 +274,29 @@ export async function streamChat(
   let retried = false
   let activeTools = tools
 
+  /**
+   * Insert a separator between text from different agentic-loop turns.
+   * Without this, turn 1 ending with "for you!" and turn 2 starting with
+   * "I'll grab..." renders as "for you!I'll grab..." in the chat — model
+   * doesn't add inter-turn whitespace, and we forward deltas verbatim.
+   * If the running combined text doesn't already end in whitespace and the
+   * incoming first delta doesn't start with whitespace, inject a space.
+   */
+  const emitTurnDelta = (text: string, isFirstDeltaOfTurn: boolean): void => {
+    if (
+      isFirstDeltaOfTurn &&
+      combinedText.length > 0 &&
+      !/\s$/.test(combinedText) &&
+      text.length > 0 &&
+      !/^\s/.test(text)
+    ) {
+      combinedText += ' '
+      callbacks.onDelta(' ')
+    }
+    combinedText += text
+    callbacks.onDelta(text)
+  }
+
   try {
     while (turn < MAX_TURNS) {
       turn += 1
@@ -293,9 +316,10 @@ export async function streamChat(
           },
           { signal: abortSignal }
         )
+        let firstDeltaThisTurn = true
         stream.on('text', (text) => {
-          combinedText += text
-          callbacks.onDelta(text)
+          emitTurnDelta(text, firstDeltaThisTurn)
+          firstDeltaThisTurn = false
         })
         final = await stream.finalMessage()
       } catch (err) {
