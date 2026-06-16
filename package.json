@@ -1,6 +1,6 @@
 {
   "name": "pocket-clawd",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "A pocket-sized Clawd that lives in your macOS menubar — pixel-art mascot, time-aware chat, persistent memory, web search, todo tools.",
   "main": "out/main/index.js",
   "license": "MIT",
@@ -34,6 +34,7 @@
     "start": "ELECTRON_RUN_AS_NODE= electron-vite preview",
     "package": "npm run build && ELECTRON_RUN_AS_NODE= electron-builder --mac --dir",
     "dist": "npm run build && ELECTRON_RUN_AS_NODE= electron-builder --mac",
+    "release:publish": "npm run build && ELECTRON_RUN_AS_NODE= electron-builder --mac --publish always",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
@@ -42,6 +43,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
     "electron-store": "^8.2.0",
+    "electron-updater": "^6.8.9",
     "framer-motion": "^11.11.0",
     "keytar": "^7.9.0",
     "nanoid": "^3.3.12",

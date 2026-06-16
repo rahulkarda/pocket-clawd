@@ -129,3 +129,21 @@ export interface WhisperEvent {
   text: string
   durationMs: number
 }
+
+// ──────────────────────────────────────────────────────────
+// Auto-update
+// ──────────────────────────────────────────────────────────
+
+export interface UpdaterStatus {
+  state:
+    | 'idle'
+    | 'checking'
+    | 'available'
+    | 'not-available'
+    | 'downloading'
+    | 'downloaded'
+    | 'error'
+  version?: string
+  message?: string
+  progress?: number
+}

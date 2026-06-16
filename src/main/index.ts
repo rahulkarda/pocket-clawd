@@ -22,6 +22,7 @@ import idleTracker from './idleTracker'
 import { fireImmediate, startWhisperEngine, stopWhisperEngine } from './whisperEngine'
 import { startRolloverTicker } from './todoStore'
 import { unregisterAllHotkeys } from './hotkey'
+import { configureAutoUpdater } from './updater'
 import { IPC } from '@shared/ipc'
 import type { AvatarAnimState } from '@shared/types'
 
@@ -181,6 +182,9 @@ async function bootstrap(): Promise<void> {
     // Poll for the user adding a key, so whispers start without a restart.
     watchForApiKey()
   }
+
+  // ─── Auto-updater (no-op in dev, active when packaged) ──
+  configureAutoUpdater()
 
   logger.info('Pocket Clawd ready')
 }

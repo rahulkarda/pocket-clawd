@@ -1,0 +1,46 @@
+name: Release
+
+# Build and publish a macOS release whenever a tag of the form v*.*.* is pushed.
+# electron-builder reads the publish.provider=github config in electron-builder.json
+# and uploads the resulting .dmg + .zip + latest-mac.yml to a GitHub Release.
+# The auto-updater in the running app pulls latest-mac.yml on each check and,
+# when a newer version is found, downloads the .zip in the background.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+# Required so electron-builder can create the GitHub Release. Limit to read+write
+# on contents only — no other scopes.
+permissions:
+  contents: write
+
+jobs:
+  release-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build tray icons (sharp)
+        run: npm run build:icons
+
+      - name: Build + publish (electron-builder)
+        # The GH_TOKEN env var lets electron-builder upload to the Release for
+        # this tag. Default GITHUB_TOKEN with contents:write is enough.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run release:publish
+
+      - name: List release artifacts
+        run: ls -la dist/
