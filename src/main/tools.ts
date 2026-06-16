@@ -356,9 +356,16 @@ function parseDdgHtml(html: string, maxResults: number): SearchResult[] {
   while ((tm = titleRe.exec(html)) !== null && results.length < maxResults) {
     const rawHref = tm[1]
     const titleHtml = tm[2]
+    // Skip DuckDuckGo sponsored / ad results — they go through `/y.js` instead
+    // of `/l/` and decode to ad-network URLs that are useless to the model.
+    if (rawHref.includes('/y.js') || rawHref.includes('ad_domain=') || rawHref.includes('ad_provider=')) {
+      continue
+    }
     const url = decodeDdgUrl(decodeHtmlEntities(rawHref))
     const title = stripTags(titleHtml)
     if (!title || !url) continue
+    // Defensive: even after decode, if the URL still points at an ad shim, skip.
+    if (url.includes('duckduckgo.com/y.js') || url.includes('bingv7aa')) continue
     // Find first snippet whose start index is after this title's match.
     const nextSnip = snippets.find((s) => s.index > tm!.index)
     let snippet = nextSnip ? nextSnip.text : ''

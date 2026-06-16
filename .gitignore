@@ -24,3 +24,6 @@ assets/tray-iconTemplate@2x.png
 *.spec.md
 todos-*.json
 todos-*.md
+
+# HANDOFF.md is local-only — contains user paths and machine state
+HANDOFF.md
