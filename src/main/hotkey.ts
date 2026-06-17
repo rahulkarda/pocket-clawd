@@ -54,3 +54,20 @@ export function unregisterAllHotkeys(): void {
   registered = null
   extraRegistered.clear()
 }
+
+/**
+ * Unregister a single accelerator (if it was previously registered via
+ * registerExtraHotkey). Used when the user changes a hotkey through
+ * Settings — we drop the old binding before installing the new one.
+ */
+export function unregisterHotkey(accelerator: string): void {
+  if (!accelerator) return
+  try {
+    if (globalShortcut.isRegistered(accelerator)) {
+      globalShortcut.unregister(accelerator)
+    }
+    extraRegistered.delete(accelerator)
+  } catch (err) {
+    logger.warn(`Failed to unregister hotkey ${accelerator}`, err)
+  }
+}

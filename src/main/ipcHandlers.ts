@@ -54,6 +54,7 @@ import type { ChatMessage, AppSettings, ChatStreamEvent } from '@shared/types'
 
 interface AppActions extends AvatarMenuActions {
   onApplyHotkey: (accel: string) => void
+  onApplySummonHotkey?: (accel: string) => void
 }
 
 /** Broadcast an event to every open window. */
@@ -82,6 +83,9 @@ export function registerIpc(actions: AppActions): void {
     }
     if (typeof patch.hotkey === 'string') {
       clean.hotkey = patch.hotkey.trim().slice(0, 100)
+    }
+    if (typeof patch.summonHotkey === 'string') {
+      clean.summonHotkey = patch.summonHotkey.trim().slice(0, 100)
     }
     if (typeof patch.outputDir === 'string') {
       clean.outputDir = patch.outputDir.slice(0, 1024)
@@ -206,6 +210,9 @@ export function registerIpc(actions: AppActions): void {
     }
     if (clean.hotkey && clean.hotkey !== prev.hotkey) {
       actions.onApplyHotkey(next.hotkey)
+    }
+    if (clean.summonHotkey !== undefined && clean.summonHotkey !== prev.summonHotkey) {
+      actions.onApplySummonHotkey?.(next.summonHotkey)
     }
     if (clean.baseURL !== undefined && clean.baseURL !== prev.baseURL) {
       resetClient()

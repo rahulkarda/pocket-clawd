@@ -47,6 +47,9 @@ export interface SessionEndPayload {
 
 export interface AppSettings {
   hotkey: string
+  /** Optional global accelerator that summons (shows + focuses) the avatar
+   *  window from any space. Empty string disables. */
+  summonHotkey: string
   outputDir: string
   model: string
   /**
@@ -111,6 +114,7 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   hotkey: 'CommandOrControl+Shift+C',
+  summonHotkey: 'CommandOrControl+Shift+P',
   outputDir: '', // resolved at runtime to ~/Documents/claude-sessions
   model: 'claude-sonnet-4-6',
   baseURL: '',

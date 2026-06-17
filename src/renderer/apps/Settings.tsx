@@ -183,6 +183,16 @@ export function SettingsApp(): JSX.Element {
           />
         </Section>
 
+        <Section title="Summon Hotkey" hint="Brings the avatar to your current space. Cmd+Alt+C is also always wired as a fallback.">
+          <input
+            value={settings.summonHotkey ?? ''}
+            onChange={(e) => setSettings((s) => ({ ...s, summonHotkey: e.target.value }))}
+            onBlur={() => update({ summonHotkey: (settings.summonHotkey ?? '').trim() })}
+            placeholder="CommandOrControl+Shift+P"
+            className="w-full bg-bg/80 border border-white/10 text-textMain text-xs font-mono rounded-lg px-3 py-2 outline-none"
+          />
+        </Section>
+
         <Section title="Output Directory" hint="Where session .spec.md files are saved.">
           <div className="flex gap-2">
             <input

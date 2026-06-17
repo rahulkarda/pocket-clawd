@@ -21,7 +21,7 @@ import { applyHotkeyFromSettings, broadcast, registerIpc } from './ipcHandlers'
 import idleTracker from './idleTracker'
 import { fireImmediate, startWhisperEngine, stopWhisperEngine } from './whisperEngine'
 import { startRolloverTicker, getDaily, onChange as onTodoChange } from './todoStore'
-import { unregisterAllHotkeys, registerExtraHotkey } from './hotkey'
+import { unregisterAllHotkeys, registerExtraHotkey, unregisterHotkey } from './hotkey'
 import { configureAutoUpdater } from './updater'
 import { IPC } from '@shared/ipc'
 import type { AvatarAnimState } from '@shared/types'
@@ -126,6 +126,39 @@ async function bootstrap(): Promise<void> {
   // ─── Avatar window (always present) ───────────────────
   createAvatarWindow()
 
+  // ─── Summon-Clawd plumbing (declared before registerIpc so the
+  //      Settings re-apply callback can close over applySummon). ───
+  const summonClawd = (): void => {
+    const avatar = getAvatarWindow()
+    if (!avatar || avatar.isDestroyed()) {
+      createAvatarWindow()
+      return
+    }
+    avatar.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+    if (!avatar.isVisible()) avatar.show()
+    avatar.setAlwaysOnTop(true, 'screen-saver')
+    avatar.moveTop()
+    avatar.focus()
+    logger.info('Summon Clawd: triggered')
+    const desired = settingsStore().get().showOnAllSpaces
+    if (!desired) {
+      setTimeout(() => {
+        if (avatar && !avatar.isDestroyed()) {
+          avatar.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true })
+        }
+      }, 600)
+    }
+  }
+  let currentSummonAccel = ''
+  const applySummon = (accel: string): void => {
+    if (currentSummonAccel) unregisterHotkey(currentSummonAccel)
+    currentSummonAccel = ''
+    if (accel) {
+      const ok = registerExtraHotkey(accel, summonClawd)
+      if (ok) currentSummonAccel = accel
+    }
+  }
+
   // ─── IPC ──────────────────────────────────────────────
   registerIpc({
     onOpenChat: () => openChatWithLifecycle(),
@@ -147,6 +180,10 @@ async function bootstrap(): Promise<void> {
         }
       })
       logger.info('Hotkey re-applied:', accel)
+    },
+    onApplySummonHotkey: (accel) => {
+      applySummon(accel)
+      logger.info('Summon hotkey re-applied:', accel)
     }
   })
 
@@ -212,35 +249,14 @@ async function bootstrap(): Promise<void> {
   // and focuses it. Useful when the user has buried it under fullscreen
   // apps or moved to a different space.
   //
-  // Cmd+Shift+P is reportedly eaten by some apps (VS Code's command
-  // palette, browsers' Print). We try a list in order; the first one the
-  // OS actually grabs wins. Even when registerExtraHotkey returns true
-  // for one of these, that doesn't guarantee macOS routes the keystroke
-  // to us — it can be soft-claimed by a focused app — so registering a
-  // secondary helps. Both fire the same handler.
-  const summonClawd = (): void => {
-    const avatar = getAvatarWindow()
-    if (!avatar || avatar.isDestroyed()) {
-      createAvatarWindow()
-      return
-    }
-    avatar.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-    if (!avatar.isVisible()) avatar.show()
-    avatar.setAlwaysOnTop(true, 'screen-saver')
-    avatar.moveTop()
-    avatar.focus()
-    logger.info('Summon Clawd: triggered')
-    const desired = settingsStore().get().showOnAllSpaces
-    if (!desired) {
-      setTimeout(() => {
-        if (avatar && !avatar.isDestroyed()) {
-          avatar.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true })
-        }
-      }, 600)
-    }
-  }
-  // Primary + fallback. Both are wired so users can hit whichever sticks.
-  registerExtraHotkey('CommandOrControl+Shift+P', summonClawd)
+  // The accelerator is user-configurable via Settings (summonHotkey).
+  // The default Cmd+Shift+P can be soft-claimed by VS Code (command
+  // palette), browsers (Print), etc. — when that happens the keystroke
+  // never reaches our handler. Users can change it to any combo from
+  // Settings; we always also register a fixed fallback (Cmd+Alt+C) so
+  // there's a known-good alternative if the primary is silent.
+  applySummon(settingsStore().get().summonHotkey)
+  // Always-on fallback that never goes away.
   registerExtraHotkey('CommandOrControl+Alt+C', summonClawd)
 
   // ─── Wake greetings ──────────────────────────────────
