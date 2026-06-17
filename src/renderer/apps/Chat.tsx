@@ -336,6 +336,91 @@ function handleSlashCommand(input: string): { ack: string; run: () => void | Pro
           await window.api.avatar.tickle()
         }
       }
+    case 'chess': {
+      // /chess              — open the board
+      // /chess e4           — open & make the move
+      // /chess vs           — toggle vs-Clawd
+      // /chess reset|new    — start a fresh game
+      if (!arg) {
+        return {
+          ack: 'Opening the chess board.',
+          run: () => window.api.chess.open()
+        }
+      }
+      const lower = arg.toLowerCase()
+      if (lower === 'vs' || lower === 'ai' || lower === 'clawd') {
+        return {
+          ack: 'Toggled vs-Clawd.',
+          run: async () => {
+            const s = await window.api.chess.getState()
+            await window.api.chess.setVsAi(!s.vsAi, 'b')
+            await window.api.chess.open()
+          }
+        }
+      }
+      if (lower === 'reset' || lower === 'new') {
+        return {
+          ack: 'Fresh board.',
+          run: async () => {
+            await window.api.chess.reset()
+            await window.api.chess.open()
+          }
+        }
+      }
+      // Otherwise treat the arg as a SAN move.
+      return {
+        ack: `${arg}…`,
+        run: async () => {
+          await window.api.chess.open()
+          const res = await window.api.chess.move(arg)
+          if (!res.ok) {
+            // Surface the error inline; keeps the chat helpful when the
+            // move was rejected.
+            // (We can't push another assistant message here without
+            // restructuring; the whisper system handles in-game feedback.)
+          }
+        }
+      }
+    }
+    case 'move': {
+      if (!arg) {
+        return { ack: 'Type a move after /move (e.g. /move e4).', run: () => undefined }
+      }
+      return {
+        ack: `${arg}…`,
+        run: async () => {
+          await window.api.chess.move(arg)
+        }
+      }
+    }
+    case 'puzzle': {
+      return {
+        ack: 'Loading the daily puzzle.',
+        run: async () => {
+          await window.api.chess.open()
+          await window.api.chess.puzzleGet()
+        }
+      }
+    }
+    case 'openings':
+    case 'opening': {
+      const slug = arg.toLowerCase().split(/\s+/)[0]
+      if (!slug) {
+        return {
+          ack: 'Try /openings sicilian (or italian, qgd).',
+          run: () => undefined
+        }
+      }
+      return {
+        ack: `Starting drill: ${slug}.`,
+        run: async () => {
+          const r = await window.api.chess.openingStart(slug)
+          if (!r.ok && r.error) {
+            // Phase A: chessOpenings stub returns an error string.
+          }
+        }
+      }
+    }
     case 'help':
     case 'commands':
     case '?':
@@ -352,10 +437,14 @@ function handleSlashCommand(input: string): { ack: string; run: () => void | Pro
           '  /costume X  — change costume (none, santa, shades, party, witch)',
           '  /settings   — open Settings',
           '  /8ball <q>  — magic 8-ball answer',
-          '  /dance      — Clawd dances for 10s',
+          '  /dance      — Clawd dances for 8s',
           '  /me <text>  — write a journal entry to memory',
           '  /mute       — toggle sound effects',
           '  /tickle     — tickle Clawd',
+          '  /chess [m]  — open the board (or play a move, /chess vs, /chess reset)',
+          '  /move <m>   — play a move on the current board (e.g. /move Nf3)',
+          '  /puzzle     — open the daily puzzle',
+          '  /openings X — opening drill (sicilian, italian, qgd)',
           '  /quit       — quit Pocket Clawd'
         ].join('\n'),
         run: () => undefined

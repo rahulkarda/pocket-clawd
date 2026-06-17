@@ -36,7 +36,9 @@ import {
   createPomodoroWindow,
   closePomodoroWindow,
   createQuickCaptureWindow,
-  closeQuickCaptureWindow
+  closeQuickCaptureWindow,
+  createChessWindow,
+  closeChessWindow
 } from './secondaryWindows'
 import { resizeAvatar, getAvatarWindow, startDrag, dragTo, endDrag, getLastLayout } from './avatarWindow'
 import { showAvatarContextMenu, type AvatarMenuActions } from './avatarMenu'
@@ -191,6 +193,9 @@ export function registerIpc(actions: AppActions): void {
       clean.mascotVariant = (allowed as readonly string[]).includes(patch.mascotVariant as string)
         ? (patch.mascotVariant as AppSettings['mascotVariant'])
         : 'clawd'
+    }
+    if (patch.chessPixelClawdKing !== undefined) {
+      clean.chessPixelClawdKing = patch.chessPixelClawdKing === true
     }
 
     const prev = settingsStore().get()
@@ -588,6 +593,90 @@ export function registerIpc(actions: AppActions): void {
   ipcMain.handle(IPC.POMODORO_STREAK_GET, async () => {
     const m = await import('./pomodoroStreak')
     return m.getState()
+  })
+
+  // ─── Chess ──────────────────────────────────────────
+  ipcMain.handle(IPC.CHESS_WINDOW_OPEN, () => {
+    createChessWindow()
+  })
+  ipcMain.handle(IPC.CHESS_WINDOW_CLOSE, () => closeChessWindow())
+  ipcMain.handle(IPC.CHESS_GET_STATE, async () => {
+    const m = await import('./chessGame')
+    return m.getState()
+  })
+  // Rate limit: at most 20 moves/second from any renderer. Human chess
+  // doesn't need faster, and this absorbs runaway move loops.
+  let lastChessMoveAt = 0
+  ipcMain.handle(IPC.CHESS_MOVE, async (_e, payload: unknown) => {
+    const now = Date.now()
+    if (now - lastChessMoveAt < 50) return { ok: false, error: 'rate limited' }
+    lastChessMoveAt = now
+    const m = await import('./chessGame')
+    // Accept either { from: [r,c], to: [r,c], promotion? } or a string move.
+    if (typeof payload === 'string') {
+      return m.tryMove(payload.slice(0, 16))
+    }
+    if (
+      payload &&
+      typeof payload === 'object' &&
+      Array.isArray((payload as { from?: unknown }).from) &&
+      Array.isArray((payload as { to?: unknown }).to)
+    ) {
+      const p = payload as {
+        from: [number, number]
+        to: [number, number]
+        promotion?: string
+      }
+      const validSquare = (s: [number, number]): boolean =>
+        Number.isInteger(s[0]) && Number.isInteger(s[1]) &&
+        s[0] >= 0 && s[0] < 8 && s[1] >= 0 && s[1] < 8
+      if (!validSquare(p.from) || !validSquare(p.to)) {
+        return { ok: false, error: 'invalid square' }
+      }
+      const promo = p.promotion
+      if (promo !== undefined && !/^[QRBNqrbn]$/.test(promo)) {
+        return { ok: false, error: 'invalid promotion' }
+      }
+      return m.tryMove({ from: p.from, to: p.to, promotion: promo as 'Q' | 'R' | 'B' | 'N' | undefined })
+    }
+    return { ok: false, error: 'malformed move' }
+  })
+  ipcMain.handle(IPC.CHESS_RESET, async () => {
+    const m = await import('./chessGame')
+    m.reset()
+  })
+  ipcMain.handle(IPC.CHESS_SET_VS_AI, async (_e, payload: unknown) => {
+    const m = await import('./chessGame')
+    const enabled = !!(payload && typeof payload === 'object' && (payload as { enabled?: unknown }).enabled)
+    const colorRaw = payload && typeof payload === 'object' ? (payload as { aiColor?: unknown }).aiColor : 'b'
+    const aiColor = colorRaw === 'w' ? 'w' : 'b'
+    m.setVsAi(enabled, aiColor)
+  })
+  ipcMain.handle(IPC.CHESS_PUZZLE_GET, async () => {
+    const m = await import('./chessPuzzle')
+    const result = m.getDailyPuzzle()
+    // Drop the puzzle position onto the board so the user can play it
+    // immediately. Disable vs-AI so the engine doesn't reply to puzzle
+    // moves.
+    const game = await import('./chessGame')
+    game.setVsAi(false, 'b')
+    if (!game.loadFEN(result.puzzle.fen)) {
+      return { ok: false, error: 'puzzle FEN failed to load' }
+    }
+    return { ok: true, ...result }
+  })
+  ipcMain.handle(IPC.CHESS_PUZZLE_RESULT, async (_e, payload: unknown) => {
+    const m = await import('./chessPuzzle')
+    const solved = !!(payload && typeof payload === 'object' && (payload as { solved?: unknown }).solved)
+    return m.recordResult(solved)
+  })
+  ipcMain.handle(IPC.CHESS_OPENING_START, async (_e, payload: unknown) => {
+    const m = await import('./chessOpenings')
+    const slug =
+      payload && typeof payload === 'object'
+        ? String((payload as { opening?: unknown }).opening ?? '').toLowerCase().slice(0, 32)
+        : ''
+    return m.start(slug)
   })
 
   // ─── Auto-update ────────────────────────────────────

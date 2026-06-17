@@ -198,6 +198,10 @@ async function bootstrap(): Promise<void> {
   // ─── Background schedulers (daily summary, hour bell, clipboard) ─
   void import('./schedulers').then((m) => m.startSchedulers())
 
+  // ─── Chess game store (load persisted board if any) ─
+  void import('./chessGame').then((m) => m.startChess())
+  void import('./chessOpenings').then((m) => m.validateOpenings())
+
   // ─── Quick capture global shortcut (Cmd+Shift+T) ────
   registerExtraHotkey('CommandOrControl+Shift+T', () => {
     void import('./secondaryWindows').then((m) => m.createQuickCaptureWindow())

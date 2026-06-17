@@ -8,6 +8,7 @@ let settingsWin: BrowserWindow | null = null
 let companionWin: BrowserWindow | null = null
 let pomodoroWin: BrowserWindow | null = null
 let quickCaptureWin: BrowserWindow | null = null
+let chessWin: BrowserWindow | null = null
 
 const TODO_W = 320
 const TODO_H = 380
@@ -19,6 +20,8 @@ const POMODORO_W = 360
 const POMODORO_H = 460
 const QUICK_W = 360
 const QUICK_H = 88
+const CHESS_W = 480
+const CHESS_H = 600
 
 function anchorAboveAvatar(w: number, h: number): { x: number; y: number } {
   const avatar = getAvatarWindow()
@@ -335,4 +338,65 @@ export function createQuickCaptureWindow(): BrowserWindow {
 export function closeQuickCaptureWindow(): void {
   if (quickCaptureWin && !quickCaptureWin.isDestroyed()) quickCaptureWin.close()
   quickCaptureWin = null
+}
+
+/**
+ * Chess window — board + move history + reset / vs-AI controls.
+ * Anchored above the avatar like Pomodoro/Todo. Larger than those because
+ * a usable board needs ~360+ px of width.
+ */
+export function createChessWindow(): BrowserWindow {
+  if (chessWin && !chessWin.isDestroyed()) {
+    chessWin.show()
+    chessWin.moveTop()
+    chessWin.focus()
+    return chessWin
+  }
+  const display = screen.getPrimaryDisplay()
+  const { width, height } = display.workAreaSize
+  chessWin = new BrowserWindow({
+    width: CHESS_W,
+    height: CHESS_H,
+    x: Math.floor((width - CHESS_W) / 2),
+    y: Math.floor((height - CHESS_H) / 2),
+    frame: false,
+    transparent: false,
+    backgroundColor: '#0D0D0D',
+    resizable: false,
+    skipTaskbar: false,
+    alwaysOnTop: false,
+    show: false,
+    title: 'Chess',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  })
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    void chessWin.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/chess.html`)
+  } else {
+    void chessWin.loadFile(path.join(__dirname, '../renderer/chess.html'))
+  }
+  chessWin.setAlwaysOnTop(true, 'screen-saver')
+  chessWin.once('ready-to-show', () => {
+    if (!chessWin) return
+    chessWin.show()
+    chessWin.moveTop()
+    chessWin.focus()
+  })
+  chessWin.on('closed', () => {
+    chessWin = null
+  })
+  return chessWin
+}
+
+export function closeChessWindow(): void {
+  if (chessWin && !chessWin.isDestroyed()) chessWin.close()
+  chessWin = null
+}
+
+export function getChessWindow(): BrowserWindow | null {
+  return chessWin
 }

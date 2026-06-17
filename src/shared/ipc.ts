@@ -122,7 +122,21 @@ export const IPC = {
 
   // ─── Pomodoro streak ────────────────────────────────
   POMODORO_STREAK_GET: 'pomodoro-streak:get',
-  POMODORO_STREAK_STATE: 'pomodoro-streak:state' // broadcast
+  POMODORO_STREAK_STATE: 'pomodoro-streak:state', // broadcast
+
+  // ─── Chess ──────────────────────────────────────────
+  CHESS_WINDOW_OPEN: 'chess-window:open',
+  CHESS_WINDOW_CLOSE: 'chess-window:close',
+  CHESS_GET_STATE: 'chess:get-state',
+  CHESS_MOVE: 'chess:move', // request: { from, to, promotion } or string
+  CHESS_RESET: 'chess:reset',
+  CHESS_SET_VS_AI: 'chess:set-vs-ai',
+  CHESS_STATE: 'chess:state', // broadcast
+  CHESS_PUZZLE_GET: 'chess:puzzle:get',
+  CHESS_PUZZLE_RESULT: 'chess:puzzle:result', // request: { solved: boolean }
+  CHESS_PUZZLE_STREAK: 'chess:puzzle:streak', // broadcast
+  CHESS_OPENING_START: 'chess:opening:start',
+  CHESS_OPENING_STATE: 'chess:opening:state' // broadcast
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

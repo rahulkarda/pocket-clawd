@@ -40,7 +40,8 @@ export default defineConfig({
           settings: resolve('src/renderer/settings.html'),
           companion: resolve('src/renderer/companion.html'),
           pomodoro: resolve('src/renderer/pomodoro.html'),
-          quick: resolve('src/renderer/quick.html')
+          quick: resolve('src/renderer/quick.html'),
+          chess: resolve('src/renderer/chess.html')
         }
       }
     }

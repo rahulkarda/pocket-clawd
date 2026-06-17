@@ -143,6 +143,38 @@ declare global {
       journal: {
         append: (text: string) => Promise<{ ok: boolean; file?: string; reason?: string }>
       }
+      chess: {
+        open: () => Promise<void>
+        close: () => Promise<void>
+        getState: () => Promise<{
+          fen: string
+          history: string[]
+          status: 'in-progress' | 'check' | 'checkmate' | 'stalemate'
+          legalMoves: string[]
+          turn: 'w' | 'b'
+          vsAi: boolean
+          aiColor: 'w' | 'b'
+        }>
+        move: (
+          payload: string | { from: [number, number]; to: [number, number]; promotion?: string }
+        ) => Promise<{ ok: boolean; san?: string; error?: string }>
+        reset: () => Promise<void>
+        setVsAi: (enabled: boolean, aiColor?: 'w' | 'b') => Promise<void>
+        onState: (
+          cb: (s: {
+            fen: string
+            history: string[]
+            status: 'in-progress' | 'check' | 'checkmate' | 'stalemate'
+            legalMoves: string[]
+            turn: 'w' | 'b'
+            vsAi: boolean
+            aiColor: 'w' | 'b'
+          }) => void
+        ) => () => void
+        puzzleGet: () => Promise<unknown>
+        puzzleResult: (solved: boolean) => Promise<{ streak: number }>
+        openingStart: (slug: string) => Promise<{ ok: boolean; error?: string }>
+      }
       snack: {
         give: () => Promise<SnackEvent | null>
         getStats: () => Promise<SnackStats>

@@ -272,6 +272,30 @@ const api = {
       ipcRenderer.invoke(IPC.JOURNAL_APPEND, text)
   },
 
+  // ─── Chess ──────────────────────────────────────────
+  chess: {
+    open: (): Promise<void> => ipcRenderer.invoke(IPC.CHESS_WINDOW_OPEN),
+    close: (): Promise<void> => ipcRenderer.invoke(IPC.CHESS_WINDOW_CLOSE),
+    getState: (): Promise<unknown> => ipcRenderer.invoke(IPC.CHESS_GET_STATE),
+    move: (
+      payload: string | { from: [number, number]; to: [number, number]; promotion?: string }
+    ): Promise<{ ok: boolean; san?: string; error?: string }> =>
+      ipcRenderer.invoke(IPC.CHESS_MOVE, payload),
+    reset: (): Promise<void> => ipcRenderer.invoke(IPC.CHESS_RESET),
+    setVsAi: (enabled: boolean, aiColor: 'w' | 'b' = 'b'): Promise<void> =>
+      ipcRenderer.invoke(IPC.CHESS_SET_VS_AI, { enabled, aiColor }),
+    onState: (cb: (s: unknown) => void): (() => void) => {
+      const listener = (_e: unknown, s: unknown): void => cb(s)
+      ipcRenderer.on(IPC.CHESS_STATE, listener)
+      return () => ipcRenderer.off(IPC.CHESS_STATE, listener)
+    },
+    puzzleGet: (): Promise<unknown> => ipcRenderer.invoke(IPC.CHESS_PUZZLE_GET),
+    puzzleResult: (solved: boolean): Promise<{ streak: number }> =>
+      ipcRenderer.invoke(IPC.CHESS_PUZZLE_RESULT, { solved }),
+    openingStart: (slug: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IPC.CHESS_OPENING_START, { opening: slug })
+  },
+
   // ─── Snack ──────────────────────────────────────────
   snack: {
     give: (): Promise<SnackEvent | null> => ipcRenderer.invoke(IPC.SNACK_GIVE),

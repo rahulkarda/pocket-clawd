@@ -105,6 +105,8 @@ export interface AppSettings {
   clipboardSuggestions: boolean
   /** Mascot color variant. Applied as CSS hue-rotate over the orange Clawd. */
   mascotVariant: 'clawd' | 'mocha' | 'mint' | 'plum'
+  /** Replace the king Unicode glyph with a pixel-Clawd sprite on the chess board. */
+  chessPixelClawdKing: boolean
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -144,7 +146,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   hourBellStart: 9,
   hourBellEnd: 18,
   clipboardSuggestions: false,
-  mascotVariant: 'clawd'
+  mascotVariant: 'clawd',
+  chessPixelClawdKing: true
 }
 
 // ──────────────────────────────────────────────────────────
