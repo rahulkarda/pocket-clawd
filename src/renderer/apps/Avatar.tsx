@@ -815,18 +815,7 @@ export function Avatar(): JSX.Element {
             transform: funFrame
               ? `rotate(${funFrame.rotateDeg}deg) scale(${funFrame.scaleX}, ${funFrame.scaleY})`
               : undefined,
-            transformOrigin: '50% 60%',
-            // Mascot color variant — pure CSS hue rotate over the
-            // orange-base SVG palette. Saturate slightly so the result
-            // doesn't look washed out.
-            filter:
-              mascotVariant === 'mocha'
-                ? 'hue-rotate(-30deg) saturate(0.7) brightness(0.8)'
-                : mascotVariant === 'mint'
-                  ? 'hue-rotate(110deg) saturate(0.85)'
-                  : mascotVariant === 'plum'
-                    ? 'hue-rotate(220deg) saturate(0.8)'
-                    : undefined
+            transformOrigin: '50% 60%'
           }}
           // Pet wobble: tiny side-to-side bob while petting state is active.
           // Doesn't fight framer-motion variants because we animate the
@@ -856,20 +845,37 @@ export function Avatar(): JSX.Element {
             // breathing/wobble variants so they don't fight the squash.
             animate={funActive ? false : variant}
           >
-            <Clawd
-              state={
-                sleeping
-                  ? 'sleep'
-                  : pettingActive
-                    ? 'blush'
-                    : allDone
-                      ? 'idle'
-                      : state
-              }
-              todosComplete={allDone && !pettingActive && !sleeping}
-              width="100%"
-              height="100%"
-            />
+            {/* Mascot variant filter wraps ONLY the Clawd SVG so costume
+                hats and the gaze pupils stay un-recolored (else a Santa
+                hat goes orange on Mocha, etc). */}
+            <div
+              className="absolute inset-0"
+              style={{
+                filter:
+                  mascotVariant === 'mocha'
+                    ? 'hue-rotate(-30deg) saturate(0.7) brightness(0.8)'
+                    : mascotVariant === 'mint'
+                      ? 'hue-rotate(110deg) saturate(0.85)'
+                      : mascotVariant === 'plum'
+                        ? 'hue-rotate(220deg) saturate(0.8)'
+                        : undefined
+              }}
+            >
+              <Clawd
+                state={
+                  sleeping
+                    ? 'sleep'
+                    : pettingActive
+                      ? 'blush'
+                      : allDone
+                        ? 'idle'
+                        : state
+                }
+                todosComplete={allDone && !pettingActive && !sleeping}
+                width="100%"
+                height="100%"
+              />
+            </div>
             {/* Costume / hat overlay — same 64x64 viewBox, stacked on top. */}
             <CostumeOverlay
               costume={costume}

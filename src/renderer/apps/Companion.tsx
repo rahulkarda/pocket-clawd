@@ -318,6 +318,24 @@ export function CompanionApp(): JSX.Element {
               <span className="text-textMain font-medium">Sound effects</span> — synthesized cues for petting, snacks, pomodoro transitions, achievements, fun-mode wall bounces, and the Konami unlock. Mute via tray menu or Settings → Sounds.
             </li>
             <li>
+              <span className="text-textMain font-medium">Wave / Tickle / High-five / Throw food / Sleep mode</span> — figure-8 cursor over Clawd waves; right-click → Tickle for a giggle; Space while pointer is over Clawd is a high-five; drag-drop a 🥬🥕🥦🍓🥝🍎🥥 (loved) or 🍕🍔🍟🌭🥩🍗 (rejected) onto Clawd; after 15 min idle Clawd curls up.
+            </li>
+            <li>
+              <span className="text-textMain font-medium">Slash commands</span> — /todo /tools /pomodoro /pet /snack /tickle /fetch /fun /costume /me /8ball /dance /mute /settings /quit /help.
+            </li>
+            <li>
+              <span className="text-textMain font-medium">Quick capture (⌘⇧T)</span> — tiny floating input. Type a todo, hit Enter, done.
+            </li>
+            <li>
+              <span className="text-textMain font-medium">Schedules</span> — daily summary whisper at a configured hour, hour-bell during work hours, clipboard URL summarize-suggestions. All in Settings → Schedules.
+            </li>
+            <li>
+              <span className="text-textMain font-medium">Mascot variants</span> — Mocha / Mint / Plum recolors via Settings → Mascot variant.
+            </li>
+            <li>
+              <span className="text-textMain font-medium">Multi-line chat</span> — Shift-Enter or backslash-then-Enter inserts a newline; plain Enter sends.
+            </li>
+            <li>
               <span className="text-textMain font-medium">Snack</span> — right-click → Give Clawd a snack 🥬. Cooldown 4 s; Clawd does a chomp animation and says "nom nom nom".
             </li>
             <li>

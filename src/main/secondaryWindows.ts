@@ -323,10 +323,9 @@ export function createQuickCaptureWindow(): BrowserWindow {
     quickCaptureWin.moveTop()
     quickCaptureWin.focus()
   })
-  // Auto-close on blur — feels right for a transient pop-in.
-  quickCaptureWin.on('blur', () => {
-    if (quickCaptureWin && !quickCaptureWin.isDestroyed()) quickCaptureWin.close()
-  })
+  // (No blur auto-close: clicking another app to copy text would
+  // otherwise discard whatever the user already typed. Esc or Enter
+  // close the window from inside the renderer.)
   quickCaptureWin.on('closed', () => {
     quickCaptureWin = null
   })

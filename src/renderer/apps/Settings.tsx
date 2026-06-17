@@ -391,7 +391,7 @@ export function SettingsApp(): JSX.Element {
 
         <Section
           title="Schedules"
-          hint="Daily summary whisper, hour bell, and clipboard URL suggestions."
+          hint={`Daily summary whisper, hour bell, and clipboard URL suggestions. All times are local (${Intl.DateTimeFormat().resolvedOptions().timeZone || 'system'}).`}
         >
           <div className="space-y-2">
             <label className="flex items-center gap-2">

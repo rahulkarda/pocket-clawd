@@ -303,9 +303,17 @@ function handleSlashCommand(input: string): { ack: string; run: () => void | Pro
     case 'dance':
       return {
         ack: '💃 dancing for 10 seconds — watch!',
-        run: async () => {
-          // Trigger fun mode for 10s as a stand-in dance loop.
-          await window.api.avatar.funFetch()
+        run: () => {
+          // Local-only: poke the avatar window directly through the
+          // tickle channel which already animates a wiggle. We re-fire
+          // a few times to extend the visible bounce; full dance loop
+          // would need its own engine + sound, deferred to follow-up.
+          let n = 0
+          const id = window.setInterval(() => {
+            void window.api.avatar.tickle()
+            n++
+            if (n >= 6) window.clearInterval(id)
+          }, 1500)
         }
       }
     case 'me':
