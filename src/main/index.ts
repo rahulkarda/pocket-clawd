@@ -207,6 +207,36 @@ async function bootstrap(): Promise<void> {
     void import('./secondaryWindows').then((m) => m.createQuickCaptureWindow())
   })
 
+  // ─── Summon Clawd (Cmd+Shift+P) ─────────────────────
+  // Brings the avatar to the active space, lifts it above other windows,
+  // and focuses it. Useful when the user has buried it under fullscreen
+  // apps or moved to a different space.
+  registerExtraHotkey('CommandOrControl+Shift+P', () => {
+    const avatar = getAvatarWindow()
+    if (!avatar || avatar.isDestroyed()) {
+      // App is alive but the avatar window was somehow destroyed. Recreate it.
+      createAvatarWindow()
+      return
+    }
+    // setVisibleOnAllWorkspaces with visibleOnFullScreen makes the avatar
+    // come to whatever space the user is currently on.
+    avatar.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+    if (!avatar.isVisible()) avatar.show()
+    avatar.setAlwaysOnTop(true, 'screen-saver')
+    avatar.moveTop()
+    avatar.focus()
+    // Restore the user's setting after a beat — if they had Show on All
+    // Spaces unchecked, we don't want to force it on permanently.
+    const desired = settingsStore().get().showOnAllSpaces
+    if (!desired) {
+      setTimeout(() => {
+        if (avatar && !avatar.isDestroyed()) {
+          avatar.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true })
+        }
+      }, 600)
+    }
+  })
+
   // ─── Wake greetings ──────────────────────────────────
   // After resuming from sleep, surface a friendly "welcome back" via the
   // whisper pipeline. Throttled by the OS so spurious resumes won't spam.
