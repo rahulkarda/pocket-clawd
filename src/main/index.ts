@@ -207,26 +207,29 @@ async function bootstrap(): Promise<void> {
     void import('./secondaryWindows').then((m) => m.createQuickCaptureWindow())
   })
 
-  // ─── Summon Clawd (Cmd+Shift+P) ─────────────────────
+  // ─── Summon Clawd hotkey ────────────────────────────
   // Brings the avatar to the active space, lifts it above other windows,
   // and focuses it. Useful when the user has buried it under fullscreen
   // apps or moved to a different space.
-  registerExtraHotkey('CommandOrControl+Shift+P', () => {
+  //
+  // Cmd+Shift+P is reportedly eaten by some apps (VS Code's command
+  // palette, browsers' Print). We try a list in order; the first one the
+  // OS actually grabs wins. Even when registerExtraHotkey returns true
+  // for one of these, that doesn't guarantee macOS routes the keystroke
+  // to us — it can be soft-claimed by a focused app — so registering a
+  // secondary helps. Both fire the same handler.
+  const summonClawd = (): void => {
     const avatar = getAvatarWindow()
     if (!avatar || avatar.isDestroyed()) {
-      // App is alive but the avatar window was somehow destroyed. Recreate it.
       createAvatarWindow()
       return
     }
-    // setVisibleOnAllWorkspaces with visibleOnFullScreen makes the avatar
-    // come to whatever space the user is currently on.
     avatar.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
     if (!avatar.isVisible()) avatar.show()
     avatar.setAlwaysOnTop(true, 'screen-saver')
     avatar.moveTop()
     avatar.focus()
-    // Restore the user's setting after a beat — if they had Show on All
-    // Spaces unchecked, we don't want to force it on permanently.
+    logger.info('Summon Clawd: triggered')
     const desired = settingsStore().get().showOnAllSpaces
     if (!desired) {
       setTimeout(() => {
@@ -235,7 +238,10 @@ async function bootstrap(): Promise<void> {
         }
       }, 600)
     }
-  })
+  }
+  // Primary + fallback. Both are wired so users can hit whichever sticks.
+  registerExtraHotkey('CommandOrControl+Shift+P', summonClawd)
+  registerExtraHotkey('CommandOrControl+Alt+C', summonClawd)
 
   // ─── Wake greetings ──────────────────────────────────
   // After resuming from sleep, surface a friendly "welcome back" via the

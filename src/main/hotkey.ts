@@ -25,15 +25,23 @@ export function registerHotkey(accelerator: string, handler: () => void): boolea
 /**
  * Register an additional global hotkey alongside the primary one. Used
  * for Quick Capture (Cmd+Shift+T) etc. Returns true on success.
+ *
+ * Note: Electron's globalShortcut.register returns true even when the
+ * OS doesn't actually route keystrokes to the handler (some accelerators
+ * are "soft-claimed" by macOS / focused apps and silently shadowed).
+ * We still log the result; if a hotkey isn't firing despite this saying
+ * "registered", the accelerator is being eaten upstream.
  */
 export function registerExtraHotkey(accelerator: string, handler: () => void): boolean {
   try {
     const ok = globalShortcut.register(accelerator, handler)
     if (ok) {
       extraRegistered.add(accelerator)
-      logger.info('Extra hotkey registered:', accelerator)
+      const isReg = globalShortcut.isRegistered(accelerator)
+      logger.info(`Extra hotkey registered: ${accelerator} (isRegistered=${isReg})`)
       return true
     }
+    logger.warn(`Extra hotkey registration returned false: ${accelerator}`)
     return false
   } catch (err) {
     logger.error('Extra hotkey registration threw', err)

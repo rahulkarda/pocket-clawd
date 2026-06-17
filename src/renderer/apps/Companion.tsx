@@ -437,7 +437,7 @@ export function CompanionApp(): JSX.Element {
         <Section title="Keyboard & input">
           <ul className="space-y-1 text-[11px] text-textMeta leading-relaxed">
             <li><Kbd>{settings?.hotkey ?? 'CommandOrControl+Shift+C'}</Kbd> — global hotkey to open chat from anywhere.</li>
-            <li><Kbd>⌘⇧P</Kbd> — summon Clawd: brings the avatar to your current space and lifts it on top.</li>
+            <li><Kbd>⌘⇧P</Kbd> or <Kbd>⌘⌥C</Kbd> — summon Clawd: brings the avatar to your current space and lifts it on top.</li>
             <li><Kbd>⌘⇧T</Kbd> — quick-capture todo (tiny floating input, Enter to add).</li>
             <li><Kbd>Drag</Kbd> the avatar — moves it; snaps to screen edges within 20 px.</li>
             <li><Kbd>Scroll</Kbd> over the avatar — resizes between 40 and 120 px.</li>
