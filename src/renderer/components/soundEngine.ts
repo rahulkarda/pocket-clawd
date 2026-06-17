@@ -59,19 +59,23 @@ function ensureContext(): { ctx: AudioContext; bus: GainNode } | null {
 export function setMuted(next: boolean): void {
   muted = next
   if (masterBus && audioCtx) {
-    masterBus.gain.cancelScheduledValues(audioCtx.currentTime)
-    masterBus.gain.linearRampToValueAtTime(
-      muted ? 0 : masterVolume,
-      audioCtx.currentTime + 0.05
-    )
+    const now = audioCtx.currentTime
+    masterBus.gain.cancelScheduledValues(now)
+    // Anchor the current value so the ramp is deterministic — without this,
+    // linearRampToValueAtTime has no preceding scheduled event to ramp from
+    // after cancelScheduledValues, and the start value becomes UA-dependent.
+    masterBus.gain.setValueAtTime(masterBus.gain.value, now)
+    masterBus.gain.linearRampToValueAtTime(muted ? 0 : masterVolume, now + 0.05)
   }
 }
 
 export function setVolume(v: number): void {
   masterVolume = Math.max(0, Math.min(1, v))
   if (!muted && masterBus && audioCtx) {
-    masterBus.gain.cancelScheduledValues(audioCtx.currentTime)
-    masterBus.gain.linearRampToValueAtTime(masterVolume, audioCtx.currentTime + 0.05)
+    const now = audioCtx.currentTime
+    masterBus.gain.cancelScheduledValues(now)
+    masterBus.gain.setValueAtTime(masterBus.gain.value, now)
+    masterBus.gain.linearRampToValueAtTime(masterVolume, now + 0.05)
   }
 }
 

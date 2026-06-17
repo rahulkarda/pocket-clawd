@@ -126,6 +126,11 @@ export function createSettingsWindow(): BrowserWindow {
   } else {
     void settingsWin.loadFile(path.join(__dirname, '../renderer/settings.html'))
   }
+  // Match the chat panel's window level so opening Settings while chat
+  // is in front doesn't bury Settings underneath. Plain alwaysOnTop:true
+  // alone isn't enough — chat is at 'screen-saver' level on macOS, and
+  // moveTop() can't lift across levels.
+  settingsWin.setAlwaysOnTop(true, 'screen-saver')
   settingsWin.once('ready-to-show', () => {
     if (!settingsWin) return
     settingsWin.show()
@@ -185,6 +190,7 @@ export function createCompanionWindow(): BrowserWindow {
   } else {
     void companionWin.loadFile(path.join(__dirname, '../renderer/companion.html'))
   }
+  companionWin.setAlwaysOnTop(true, 'screen-saver')
   companionWin.once('ready-to-show', () => {
     if (!companionWin) return
     companionWin.show()

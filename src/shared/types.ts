@@ -135,7 +135,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 // Avatar state
 // ──────────────────────────────────────────────────────────
 
-export type AvatarAnimState = 'idle' | 'whisper' | 'idle-alert' | 'active' | 'blush'
+export type AvatarAnimState = 'idle' | 'whisper' | 'idle-alert' | 'active' | 'blush' | 'sleep'
 
 // ──────────────────────────────────────────────────────────
 // Time of day

@@ -441,6 +441,36 @@ export function registerIpc(actions: AppActions): void {
   ipcMain.handle(IPC.PET_REGISTER, () => petting.registerPet())
   ipcMain.handle(IPC.PET_GET_STATS, () => petting.getStats())
 
+  // ─── Phase 2 interactions ───────────────────────────
+  // Tickle: tray / context menu fires a tickle event; renderer animates +
+  // we surface a quick whisper. No persistent counter for v1.
+  ipcMain.handle(IPC.AVATAR_TICKLE, () => {
+    broadcast(IPC.AVATAR_TICKLE_EVENT, { ts: Date.now() })
+    void import('./sound').then((m) => m.playSound('pet')).catch(() => undefined)
+  })
+  // Food drop: user drag-and-dropped an emoji on the avatar window.
+  // Match against a small reaction table, broadcast the verdict to
+  // renderer so it can show the right face / particle. The renderer
+  // does its own validation (only single emoji); main re-validates the
+  // payload here as a defense-in-depth against future renderer bugs.
+  ipcMain.handle(IPC.AVATAR_FOOD_DROP, (_e, payload: unknown) => {
+    const food =
+      payload && typeof payload === 'object'
+        ? String((payload as { emoji?: unknown }).emoji ?? '').slice(0, 8)
+        : ''
+    if (!food) return { reaction: 'reject' as const, food: '' }
+    const loves = ['🥬', '🥕', '🥦', '🍓', '🥝', '🍎', '🥥']
+    const rejects = ['🍕', '🍔', '🍟', '🌭', '🥩', '🍗']
+    let reaction: 'love' | 'meh' | 'reject' = 'meh'
+    if (loves.includes(food)) reaction = 'love'
+    else if (rejects.includes(food)) reaction = 'reject'
+    broadcast(IPC.AVATAR_FOOD_REACTION, { food, reaction })
+    if (reaction === 'love') {
+      void import('./sound').then((m) => m.playSound('snack')).catch(() => undefined)
+    }
+    return { reaction, food }
+  })
+
   // ─── Snack ──────────────────────────────────────────
   ipcMain.handle(IPC.SNACK_GIVE, () => snackEngine.giveSnack())
   ipcMain.handle(IPC.SNACK_GET_STATS, () => snackEngine.getStats())

@@ -86,6 +86,14 @@ export function Avatar(): JSX.Element {
   const [gaze, setGaze] = useState<'left' | 'right' | 'none'>('none')
   const [emote, setEmote] = useState<string | null>(null)
   const emoteTimeoutRef = useRef<number | null>(null)
+  // Phase 2 reaction states.
+  const [tickleActive, setTickleActive] = useState(false)
+  const [waveActive, setWaveActive] = useState(false)
+  const [highFiveActive, setHighFiveActive] = useState(false)
+  const [foodReaction, setFoodReaction] = useState<{ food: string; reaction: 'love' | 'meh' | 'reject' } | null>(null)
+  const [sleeping, setSleeping] = useState(false)
+  const reactionTimerRef = useRef<number | null>(null)
+  const foodTimerRef = useRef<number | null>(null)
   const wheelAccum = useRef(0)
   const lastResize = useRef(0)
   const whisperTimerRef = useRef<number | null>(null)
@@ -190,6 +198,27 @@ export function Avatar(): JSX.Element {
     const offPlaySound = window.api.avatar.onPlaySound((name) => {
       playSound(name as SoundName)
     })
+
+    // Phase 2 subscriptions.
+    const offTickle = window.api.avatar.onTickle(() => {
+      if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current)
+      setTickleActive(true)
+      reactionTimerRef.current = window.setTimeout(() => setTickleActive(false), 2000)
+    })
+    const offWave = window.api.avatar.onWave(() => {
+      setWaveActive(true)
+      window.setTimeout(() => setWaveActive(false), 1200)
+    })
+    const offHighFive = window.api.avatar.onHighFive(() => {
+      setHighFiveActive(true)
+      window.setTimeout(() => setHighFiveActive(false), 900)
+    })
+    const offFoodReaction = window.api.avatar.onFoodReaction((r) => {
+      if (foodTimerRef.current) window.clearTimeout(foodTimerRef.current)
+      setFoodReaction(r)
+      foodTimerRef.current = window.setTimeout(() => setFoodReaction(null), 1800)
+    })
+    const offSleepState = window.api.avatar.onSleepState(setSleeping)
     void window.api.collection.get().then((c) => setCollectionItems(c.items))
     const offCollection = window.api.collection.onEvent((c) => setCollectionItems(c.items))
     void window.api.pomodoroStreak.get().then(setStreak)
@@ -231,6 +260,11 @@ export function Avatar(): JSX.Element {
       offSettings()
       offRave()
       offPlaySound()
+      offTickle()
+      offWave()
+      offHighFive()
+      offFoodReaction()
+      offSleepState()
       offCollection()
       offStreak()
       offGaze()
@@ -278,6 +312,112 @@ export function Avatar(): JSX.Element {
     }
     window.addEventListener('contextmenu', onCtx)
     return () => window.removeEventListener('contextmenu', onCtx)
+  }, [])
+
+  // Phase 2: figure-8 wave detector + high-five (click + space).
+  // Both run as side-effects; they don't conflict with the stroke gesture
+  // because the wave detector tracks pointermove WITHOUT requiring a
+  // pointerdown — passive hover detection.
+  useEffect(() => {
+    const xFlips: number[] = []
+    const yFlips: number[] = []
+    let lastX = 0
+    let lastY = 0
+    let lastSignX = 0
+    let lastSignY = 0
+    const WINDOW_MS = 1200
+    const NEEDED = 3
+    const onMove = (e: PointerEvent): void => {
+      // Only count when over the avatar slot.
+      const slot = avatarSlotRef.current
+      if (!slot) return
+      const r = slot.getBoundingClientRect()
+      const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
+      if (!inside) {
+        xFlips.length = 0
+        yFlips.length = 0
+        return
+      }
+      const dx = e.clientX - lastX
+      const dy = e.clientY - lastY
+      const sx = dx > 1 ? 1 : dx < -1 ? -1 : 0
+      const sy = dy > 1 ? 1 : dy < -1 ? -1 : 0
+      const now = Date.now()
+      if (sx !== 0 && sx !== lastSignX && lastSignX !== 0) xFlips.push(now)
+      if (sy !== 0 && sy !== lastSignY && lastSignY !== 0) yFlips.push(now)
+      if (sx !== 0) lastSignX = sx
+      if (sy !== 0) lastSignY = sy
+      lastX = e.clientX
+      lastY = e.clientY
+      // Drop old entries.
+      while (xFlips.length && now - xFlips[0]! > WINDOW_MS) xFlips.shift()
+      while (yFlips.length && now - yFlips[0]! > WINDOW_MS) yFlips.shift()
+      if (xFlips.length >= NEEDED && yFlips.length >= NEEDED) {
+        xFlips.length = 0
+        yFlips.length = 0
+        // Fire a local wave + tell main to broadcast (so future side
+        // effects like sound or telemetry can hook in).
+        setWaveActive(true)
+        window.setTimeout(() => setWaveActive(false), 1200)
+      }
+    }
+    window.addEventListener('pointermove', onMove)
+    return () => window.removeEventListener('pointermove', onMove)
+  }, [])
+
+  // High-five: spacebar pressed while pointer is over the avatar slot
+  // (no mouse click required — too easy to misfire with click).
+  useEffect(() => {
+    let pointerOverSlot = false
+    let lastFireAt = 0
+    const onMove = (e: PointerEvent): void => {
+      const slot = avatarSlotRef.current
+      if (!slot) return
+      const r = slot.getBoundingClientRect()
+      pointerOverSlot =
+        e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.code !== 'Space') return
+      if (!pointerOverSlot) return
+      const now = Date.now()
+      if (now - lastFireAt < 1500) return
+      lastFireAt = now
+      setHighFiveActive(true)
+      window.setTimeout(() => setHighFiveActive(false), 900)
+      playSound('snack' as SoundName)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [])
+
+  // Drag-and-drop emoji onto the avatar slot.
+  useEffect(() => {
+    const slot = avatarSlotRef.current
+    if (!slot) return
+    const onDragOver = (e: DragEvent): void => {
+      e.preventDefault()
+    }
+    const onDrop = (e: DragEvent): void => {
+      e.preventDefault()
+      const text = e.dataTransfer?.getData('text/plain') ?? ''
+      // Match any single emoji (loose: any non-ASCII char).
+      const match = text.trim().match(/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]+$/u)
+      if (!match) return
+      const emoji = Array.from(match[0])[0] ?? ''
+      if (!emoji) return
+      void window.api.avatar.foodDrop(emoji)
+    }
+    slot.addEventListener('dragover', onDragOver)
+    slot.addEventListener('drop', onDrop)
+    return () => {
+      slot.removeEventListener('dragover', onDragOver)
+      slot.removeEventListener('drop', onDrop)
+    }
   }, [])
 
   const ratio = todos && todos.todos.length ? todos.todos.filter((t) => t.done).length / todos.todos.length : 0
@@ -685,8 +825,16 @@ export function Avatar(): JSX.Element {
             animate={funActive ? false : variant}
           >
             <Clawd
-              state={pettingActive ? 'blush' : allDone ? 'idle' : state}
-              todosComplete={allDone && !pettingActive}
+              state={
+                sleeping
+                  ? 'sleep'
+                  : pettingActive
+                    ? 'blush'
+                    : allDone
+                      ? 'idle'
+                      : state
+              }
+              todosComplete={allDone && !pettingActive && !sleeping}
               width="100%"
               height="100%"
             />
@@ -774,6 +922,91 @@ export function Avatar(): JSX.Element {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Wave reaction — ✋ briefly above Clawd's head. */}
+        <AnimatePresence>
+          {waveActive && (
+            <motion.div
+              key={`wave-${Date.now()}`}
+              className="pointer-events-none absolute"
+              style={{ left: '50%', top: -10, fontSize: Math.max(16, size * 0.4) }}
+              initial={{ opacity: 0, x: '-50%', y: 6, rotate: -30 }}
+              animate={{ opacity: 1, x: '-50%', y: 0, rotate: [0, -25, 25, -15, 15, 0] }}
+              exit={{ opacity: 0, x: '-50%', y: -8 }}
+              transition={{ duration: 1.0 }}
+            >
+              ✋
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* High-five reaction — bigger ✋ that pops in. */}
+        <AnimatePresence>
+          {highFiveActive && (
+            <motion.div
+              key={`hf-${Date.now()}`}
+              className="pointer-events-none absolute"
+              style={{ left: '50%', top: '20%', fontSize: Math.max(20, size * 0.55) }}
+              initial={{ opacity: 0, x: '-50%', scale: 0.4 }}
+              animate={{ opacity: 1, x: '-50%', scale: [0.4, 1.2, 1] }}
+              exit={{ opacity: 0, x: '-50%', scale: 0.6 }}
+              transition={{ duration: 0.7 }}
+            >
+              ✋
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Tickle — Clawd does a giggle wiggle (the wrapper rotates). The
+            visible cue is also a 🤭 emoji floating up. */}
+        <AnimatePresence>
+          {tickleActive && (
+            <motion.div
+              key={`tk-${Date.now()}`}
+              className="pointer-events-none absolute"
+              style={{ left: '50%', top: '5%', fontSize: Math.max(14, size * 0.4) }}
+              initial={{ opacity: 0, x: '-50%', y: 6 }}
+              animate={{ opacity: 1, x: '-50%', y: -8 }}
+              exit={{ opacity: 0, x: '-50%' }}
+              transition={{ duration: 1.6 }}
+            >
+              🤭
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Food reaction — 💕 / 😐 / 🚫 next to Clawd. */}
+        <AnimatePresence>
+          {foodReaction && (
+            <motion.div
+              key={`food-${foodReaction.food}-${Date.now()}`}
+              className="pointer-events-none absolute"
+              style={{ left: '70%', top: '25%', fontSize: Math.max(14, size * 0.36) }}
+              initial={{ opacity: 0, scale: 0.5, x: '-50%' }}
+              animate={{ opacity: 1, scale: 1, x: '-50%' }}
+              exit={{ opacity: 0, x: '-50%' }}
+              transition={{ duration: 0.4 }}
+            >
+              {foodReaction.reaction === 'love'
+                ? '💕'
+                : foodReaction.reaction === 'reject'
+                  ? '🚫'
+                  : '😐'}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Sleep z's — when Clawd is sleeping, gentle z's float up. */}
+        {sleeping && (
+          <motion.div
+            className="pointer-events-none absolute"
+            style={{ left: '70%', top: '5%', fontSize: Math.max(14, size * 0.32) }}
+            animate={{ opacity: [0.2, 1, 0.2], y: [0, -10, -20] }}
+            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            💤
+          </motion.div>
+        )}
 
         {/* Streak badge — small 🔥 chip in upper-right while a streak is active. */}
         {streak && streak.currentDays > 0 && (

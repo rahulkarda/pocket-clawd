@@ -156,6 +156,28 @@ const Blush: ComponentType<SVGProps<SVGSVGElement>> = (props) => (
   </svg>
 )
 
+/** Sleep — closed eyes, gentle Clawd. Body squashed slightly to look curled. */
+const Sleep: ComponentType<SVGProps<SVGSVGElement>> = (props) => (
+  <svg viewBox="0 0 64 64" shapeRendering="crispEdges" xmlns="http://www.w3.org/2000/svg" {...props}>
+    {/* ear nubs lower */}
+    <rect x="4" y="22" width="4" height="6" rx="2" fill="#D4622A" />
+    <rect x="56" y="22" width="4" height="6" rx="2" fill="#D4622A" />
+    {/* body — slightly shorter, slightly tilted */}
+    <rect x="8" y="16" width="48" height="28" rx="6" fill="#D4622A" />
+    <rect x="8" y="40" width="48" height="4" fill="#A84B1F" />
+    {/* eyes — closed (single horizontal line) */}
+    <rect x="18" y="26" width="8" height="2" fill="#1a1208" />
+    <rect x="38" y="26" width="8" height="2" fill="#1a1208" />
+    {/* legs — tucked under (shorter) */}
+    <rect x="14" y="44" width="8" height="8" rx="2" fill="#D4622A" />
+    <rect x="28" y="44" width="8" height="8" rx="2" fill="#D4622A" />
+    <rect x="42" y="44" width="8" height="8" rx="2" fill="#D4622A" />
+    <rect x="14" y="50" width="8" height="2" fill="#A84B1F" />
+    <rect x="28" y="50" width="8" height="2" fill="#A84B1F" />
+    <rect x="42" y="50" width="8" height="2" fill="#A84B1F" />
+  </svg>
+)
+
 /**
  * Pick which variant to show based on:
  * - explicit avatar animation state
@@ -176,6 +198,8 @@ export function Clawd({ state, todosComplete, ...rest }: ClawdProps): JSX.Elemen
       return <IdleAlert {...rest} />
     case 'blush':
       return <Blush {...rest} />
+    case 'sleep':
+      return <Sleep {...rest} />
     case 'whisper':
     case 'idle':
     default:
@@ -183,4 +207,4 @@ export function Clawd({ state, todosComplete, ...rest }: ClawdProps): JSX.Elemen
   }
 }
 
-export const ClawdVariants = { Idle, Active, IdleAlert, Happy, Blush }
+export const ClawdVariants = { Idle, Active, IdleAlert, Happy, Blush, Sleep }

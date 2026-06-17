@@ -172,6 +172,15 @@ async function bootstrap(): Promise<void> {
   idleTracker.on('active', () => {
     if (currentAnimState === 'idle-alert') setAvatarState('idle')
   })
+  // Phase 2 sleep mode: broadcast AVATAR_SLEEP_STATE so the avatar
+  // renderer can show a curled-up Clawd with z's. Independent of the
+  // idle-alert state; both can be active simultaneously.
+  idleTracker.on('sleeping', () => {
+    broadcast(IPC.AVATAR_SLEEP_STATE, { sleeping: true })
+  })
+  idleTracker.on('awake', () => {
+    broadcast(IPC.AVATAR_SLEEP_STATE, { sleeping: false })
+  })
   idleTracker.start()
 
   // ─── Todo rollover ────────────────────────────────────

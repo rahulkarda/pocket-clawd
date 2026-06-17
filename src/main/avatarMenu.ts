@@ -1,11 +1,12 @@
 /** Right-click context menu for the floating avatar. */
-import { Menu, type BrowserWindow } from 'electron'
+import { BrowserWindow, Menu } from 'electron'
 import { settingsStore } from './settings'
 import { resizeAvatar, setShowOnAllSpaces } from './avatarWindow'
 import * as funEngine from './funEngine'
 import * as pomodoro from './pomodoro'
 import * as petting from './pettingEngine'
 import * as snackEngine from './snackEngine'
+import { IPC } from '@shared/ipc'
 
 export interface AvatarMenuActions {
   onOpenChat: () => void
@@ -54,6 +55,15 @@ export function showAvatarContextMenu(win: BrowserWindow, actions: AvatarMenuAct
       label: 'Give Clawd a snack 🥬',
       click: () => {
         snackEngine.giveSnack()
+      }
+    },
+    {
+      label: 'Tickle Clawd 🤭',
+      click: () => {
+        for (const w of BrowserWindow.getAllWindows()) {
+          if (!w.isDestroyed()) w.webContents.send(IPC.AVATAR_TICKLE_EVENT, { ts: Date.now() })
+        }
+        void import('./sound').then((m) => m.playSound('pet')).catch(() => undefined)
       }
     },
     {

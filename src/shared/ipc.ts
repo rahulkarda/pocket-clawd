@@ -65,6 +65,15 @@ export const IPC = {
   AVATAR_EMOTE: 'avatar:emote', // broadcast — momentary emoji emote (sweat/etc)
   AVATAR_PLAY_SOUND: 'avatar:play-sound', // broadcast — renderer plays a synthesized cue
 
+  // ─── Phase 2 interactions ───────────────────────────
+  AVATAR_WAVE: 'avatar:wave', // broadcast — render a wave reaction
+  AVATAR_TICKLE: 'avatar:tickle', // request: trigger a tickle (from menu)
+  AVATAR_TICKLE_EVENT: 'avatar:tickle-event', // broadcast — render tickle anim
+  AVATAR_HIGH_FIVE: 'avatar:high-five', // broadcast — render high-five anim
+  AVATAR_FOOD_DROP: 'avatar:food-drop', // request: user dropped an emoji on Clawd (renderer→main)
+  AVATAR_FOOD_REACTION: 'avatar:food-reaction', // broadcast — Clawd reacts to dropped food
+  AVATAR_SLEEP_STATE: 'avatar:sleep-state', // broadcast — sleeping vs awake
+
   // ─── App ────────────────────────────────────────────
   APP_QUIT: 'app:quit',
   APP_OPEN_LAST_SPEC: 'app:open-last-spec',

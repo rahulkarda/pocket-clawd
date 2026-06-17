@@ -163,6 +163,40 @@ const api = {
       const listener = (_e: unknown, name: string): void => cb(name)
       ipcRenderer.on(IPC.AVATAR_PLAY_SOUND, listener)
       return () => ipcRenderer.off(IPC.AVATAR_PLAY_SOUND, listener)
+    },
+    // Phase 2 interactions
+    tickle: (): Promise<void> => ipcRenderer.invoke(IPC.AVATAR_TICKLE),
+    onTickle: (cb: () => void): (() => void) => {
+      const listener = (): void => cb()
+      ipcRenderer.on(IPC.AVATAR_TICKLE_EVENT, listener)
+      return () => ipcRenderer.off(IPC.AVATAR_TICKLE_EVENT, listener)
+    },
+    foodDrop: (emoji: string): Promise<{ reaction: 'love' | 'meh' | 'reject'; food: string }> =>
+      ipcRenderer.invoke(IPC.AVATAR_FOOD_DROP, { emoji }),
+    onFoodReaction: (
+      cb: (e: { food: string; reaction: 'love' | 'meh' | 'reject' }) => void
+    ): (() => void) => {
+      const listener = (
+        _e: unknown,
+        payload: { food: string; reaction: 'love' | 'meh' | 'reject' }
+      ): void => cb(payload)
+      ipcRenderer.on(IPC.AVATAR_FOOD_REACTION, listener)
+      return () => ipcRenderer.off(IPC.AVATAR_FOOD_REACTION, listener)
+    },
+    onSleepState: (cb: (sleeping: boolean) => void): (() => void) => {
+      const listener = (_e: unknown, payload: { sleeping: boolean }): void => cb(payload.sleeping)
+      ipcRenderer.on(IPC.AVATAR_SLEEP_STATE, listener)
+      return () => ipcRenderer.off(IPC.AVATAR_SLEEP_STATE, listener)
+    },
+    onWave: (cb: () => void): (() => void) => {
+      const listener = (): void => cb()
+      ipcRenderer.on(IPC.AVATAR_WAVE, listener)
+      return () => ipcRenderer.off(IPC.AVATAR_WAVE, listener)
+    },
+    onHighFive: (cb: () => void): (() => void) => {
+      const listener = (): void => cb()
+      ipcRenderer.on(IPC.AVATAR_HIGH_FIVE, listener)
+      return () => ipcRenderer.off(IPC.AVATAR_HIGH_FIVE, listener)
     }
   },
 

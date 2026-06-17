@@ -96,6 +96,15 @@ declare global {
         onGaze: (cb: (direction: 'left' | 'right' | 'none') => void) => () => void
         onEmote: (cb: (e: { emoji: string; durationMs: number }) => void) => () => void
         onPlaySound: (cb: (name: string) => void) => () => void
+        tickle: () => Promise<void>
+        onTickle: (cb: () => void) => () => void
+        foodDrop: (emoji: string) => Promise<{ reaction: 'love' | 'meh' | 'reject'; food: string }>
+        onFoodReaction: (
+          cb: (e: { food: string; reaction: 'love' | 'meh' | 'reject' }) => void
+        ) => () => void
+        onSleepState: (cb: (sleeping: boolean) => void) => () => void
+        onWave: (cb: () => void) => () => void
+        onHighFive: (cb: () => void) => () => void
       }
       app: {
         quit: () => Promise<void>

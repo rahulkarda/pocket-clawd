@@ -4,10 +4,13 @@
  * (pet, snack, pomodoro, fun, etc) don't each need to know about
  * BrowserWindow plumbing.
  *
- * The renderer side (avatar.tsx + soundEngine.ts) gates on the user's
- * mute / volume settings; this just fires-and-forgets the broadcast.
+ * Targets the avatar window ONLY. Other renderers (chat, todo, settings,
+ * companion, pomodoro) host the same preload and would receive these
+ * messages via getAllWindows(); we keep the channel narrowed to the
+ * avatar so nothing else can observe playback events. (Per Phase 1
+ * audit: principle of least channel.)
  */
-import { BrowserWindow } from 'electron'
+import { getAvatarWindow } from './avatarWindow'
 import { IPC } from '@shared/ipc'
 
 export type SoundName =
@@ -21,7 +24,8 @@ export type SoundName =
   | 'wake'
 
 export function playSound(name: SoundName): void {
-  for (const w of BrowserWindow.getAllWindows()) {
-    if (!w.isDestroyed()) w.webContents.send(IPC.AVATAR_PLAY_SOUND, name)
-  }
+  const win = getAvatarWindow()
+  if (!win || win.isDestroyed()) return
+  win.webContents.send(IPC.AVATAR_PLAY_SOUND, name)
 }
+
