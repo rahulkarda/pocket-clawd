@@ -202,6 +202,16 @@ const api = {
       const listener = (): void => cb()
       ipcRenderer.on(IPC.AVATAR_HIGH_FIVE, listener)
       return () => ipcRenderer.off(IPC.AVATAR_HIGH_FIVE, listener)
+    },
+    dance: (durationMs?: number): Promise<{ ok: true }> =>
+      ipcRenderer.invoke(IPC.AVATAR_DANCE, { durationMs }),
+    onDanceState: (cb: (active: boolean, remainingMs: number) => void): (() => void) => {
+      const listener = (
+        _e: unknown,
+        payload: { active: boolean; remainingMs: number }
+      ): void => cb(payload.active, payload.remainingMs)
+      ipcRenderer.on(IPC.AVATAR_DANCE_STATE, listener)
+      return () => ipcRenderer.off(IPC.AVATAR_DANCE_STATE, listener)
     }
   },
 

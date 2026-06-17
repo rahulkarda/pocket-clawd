@@ -22,6 +22,7 @@ export type SoundName =
   | 'wall-bounce'
   | 'rave'
   | 'wake'
+  | 'dance'
 
 export function playSound(name: SoundName): void {
   const win = getAvatarWindow()

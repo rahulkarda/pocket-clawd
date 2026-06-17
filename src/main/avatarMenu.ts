@@ -64,6 +64,9 @@ export function showAvatarContextMenu(win: BrowserWindow, actions: AvatarMenuAct
           if (!w.isDestroyed()) w.webContents.send(IPC.AVATAR_TICKLE_EVENT, { ts: Date.now() })
         }
         void import('./sound').then((m) => m.playSound('pet')).catch(() => undefined)
+        void import('./whisperEngine')
+          .then((m) => m.surfaceWhisper('tickle tickle!'))
+          .catch(() => undefined)
       }
     },
     {

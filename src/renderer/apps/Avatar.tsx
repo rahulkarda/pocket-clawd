@@ -93,6 +93,9 @@ export function Avatar(): JSX.Element {
   const [highFiveActive, setHighFiveActive] = useState(false)
   const [foodReaction, setFoodReaction] = useState<{ food: string; reaction: 'love' | 'meh' | 'reject' } | null>(null)
   const [sleeping, setSleeping] = useState(false)
+  const [dancing, setDancing] = useState(false)
+  const danceBeatTimerRef = useRef<number | null>(null)
+  const danceStopTimerRef = useRef<number | null>(null)
   const reactionTimerRef = useRef<number | null>(null)
   const foodTimerRef = useRef<number | null>(null)
   const wheelAccum = useRef(0)
@@ -221,6 +224,39 @@ export function Avatar(): JSX.Element {
       setFoodReaction(r)
       foodTimerRef.current = window.setTimeout(() => setFoodReaction(null), 1800)
     })
+    // Dance — main owns timing; we run a fast bob via Framer + loop the
+    // 'dance' sound recipe at ~500ms cadence so audio + animation stay
+    // tight (cheaper than IPC-driven beats and not subject to jitter).
+    const offDanceState = window.api.avatar.onDanceState((active, remainingMs) => {
+      // Always clear any existing timers — calls during an active dance
+      // restart the duration, so re-arm.
+      if (danceBeatTimerRef.current !== null) {
+        window.clearInterval(danceBeatTimerRef.current)
+        danceBeatTimerRef.current = null
+      }
+      if (danceStopTimerRef.current !== null) {
+        window.clearTimeout(danceStopTimerRef.current)
+        danceStopTimerRef.current = null
+      }
+      setDancing(active)
+      if (!active) return
+      // Kick off the first beat immediately, then loop.
+      playSound('dance')
+      danceBeatTimerRef.current = window.setInterval(() => {
+        playSound('dance')
+      }, 480) // 125 BPM-ish; matches the bob cycle below
+      // Stop the beat loop right when main says we're done. Belt + braces:
+      // even if AVATAR_DANCE_STATE(false) somehow doesn't arrive (window
+      // closed?), the timer self-clears.
+      danceStopTimerRef.current = window.setTimeout(() => {
+        if (danceBeatTimerRef.current !== null) {
+          window.clearInterval(danceBeatTimerRef.current)
+          danceBeatTimerRef.current = null
+        }
+        danceStopTimerRef.current = null
+        setDancing(false)
+      }, remainingMs + 50)
+    })
     const offSleepState = window.api.avatar.onSleepState(setSleeping)
     void window.api.collection.get().then((c) => setCollectionItems(c.items))
     const offCollection = window.api.collection.onEvent((c) => setCollectionItems(c.items))
@@ -272,6 +308,15 @@ export function Avatar(): JSX.Element {
       offStreak()
       offGaze()
       offEmote()
+      offDanceState()
+      if (danceBeatTimerRef.current !== null) {
+        window.clearInterval(danceBeatTimerRef.current)
+        danceBeatTimerRef.current = null
+      }
+      if (danceStopTimerRef.current !== null) {
+        window.clearTimeout(danceStopTimerRef.current)
+        danceStopTimerRef.current = null
+      }
       if (whisperTimerRef.current !== null) {
         window.clearTimeout(whisperTimerRef.current)
       }
@@ -821,21 +866,28 @@ export function Avatar(): JSX.Element {
           // Doesn't fight framer-motion variants because we animate the
           // wrapper, not the inner motion.div.
           // Snack chomp: a quick scaleY pulse loop while snacking.
+          // Dance: faster head-bob + side sway, looped infinitely while
+          // dancing — explicitly takes priority over pet/snack so /dance
+          // mid-snack still reads as dancing.
           // (Co-pilot gaze used to tilt the body here; that was confusing —
           // gaze is now a pure eye-pupil overlay below.)
           animate={
-            pettingActive
-              ? { rotate: [-4, 4, -3, 3, 0] }
-              : isSnacking
-                ? { scaleY: [1, 0.92, 1, 0.94, 1], rotate: 0 }
-                : { rotate: 0 }
+            dancing
+              ? { rotate: [-8, 8, -8], y: [0, -6, 0] }
+              : pettingActive
+                ? { rotate: [-4, 4, -3, 3, 0] }
+                : isSnacking
+                  ? { scaleY: [1, 0.92, 1, 0.94, 1], rotate: 0 }
+                  : { rotate: 0 }
           }
           transition={
-            pettingActive
-              ? { duration: 0.6, ease: 'easeInOut' }
-              : isSnacking
-                ? { duration: 0.45, ease: 'easeInOut', repeat: Infinity }
-                : { duration: 0.2 }
+            dancing
+              ? { duration: 0.48, ease: 'easeInOut', repeat: Infinity }
+              : pettingActive
+                ? { duration: 0.6, ease: 'easeInOut' }
+                : isSnacking
+                  ? { duration: 0.45, ease: 'easeInOut', repeat: Infinity }
+                  : { duration: 0.2 }
           }
         >
           <motion.div
@@ -995,23 +1047,9 @@ export function Avatar(): JSX.Element {
           )}
         </AnimatePresence>
 
-        {/* Tickle — Clawd does a giggle wiggle (the wrapper rotates). The
-            visible cue is also a 🤭 emoji floating up. */}
-        <AnimatePresence>
-          {tickleActive && (
-            <motion.div
-              key={`tk-${Date.now()}`}
-              className="pointer-events-none absolute"
-              style={{ left: '50%', top: '5%', fontSize: Math.max(14, size * 0.4) }}
-              initial={{ opacity: 0, x: '-50%', y: 6 }}
-              animate={{ opacity: 1, x: '-50%', y: -8 }}
-              exit={{ opacity: 0, x: '-50%' }}
-              transition={{ duration: 1.6 }}
-            >
-              🤭
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Tickle — Clawd does a giggle wiggle (the wrapper rotates).
+            Visible cue is now a text whisper ("tickle tickle!") fired
+            from main, so no in-slot emoji here. */}
 
         {/* Food reaction — 💕 / 😐 / 🚫 next to Clawd. */}
         <AnimatePresence>

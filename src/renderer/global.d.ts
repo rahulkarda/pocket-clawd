@@ -109,6 +109,8 @@ declare global {
         onSleepState: (cb: (sleeping: boolean) => void) => () => void
         onWave: (cb: () => void) => () => void
         onHighFive: (cb: () => void) => () => void
+        dance: (durationMs?: number) => Promise<{ ok: true }>
+        onDanceState: (cb: (active: boolean, remainingMs: number) => void) => () => void
       }
       app: {
         quit: () => Promise<void>

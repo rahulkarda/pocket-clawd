@@ -26,6 +26,7 @@ export type SoundName =
   | 'wall-bounce'   // fun-mode wall hit (small)
   | 'rave'          // konami unlock (longer, ascending)
   | 'wake'          // welcome back on wake from sleep
+  | 'dance'         // /dance groove — short syncopated bass+blip pulse
 
 let audioCtx: AudioContext | null = null
 let masterBus: GainNode | null = null
@@ -264,6 +265,55 @@ function wakeHum(ctx: AudioContext, bus: GainNode): void {
   pomoChime(ctx, bus, 540, 720)
 }
 
+/**
+ * Dance groove — one short syncopated pulse: thumpy sine bass + bright
+ * triangle blip on top. Designed to repeat on a ~500ms cadence so calling
+ * `playSound('dance')` from the dance loop produces a continuous beat
+ * without sequencing complexity. Each call is ~200ms of audible content.
+ */
+function danceBeat(ctx: AudioContext, bus: GainNode): void {
+  const t0 = ctx.currentTime
+
+  // Bass thump (kick-ish): low sine with fast pitch drop.
+  const bassEnv = ctx.createGain()
+  bassEnv.gain.setValueAtTime(0.0001, t0)
+  bassEnv.gain.linearRampToValueAtTime(0.25, t0 + 0.008)
+  bassEnv.gain.setTargetAtTime(0.0001, t0 + 0.04, 0.05)
+  bassEnv.gain.linearRampToValueAtTime(0, t0 + 0.18)
+
+  const bass = ctx.createOscillator()
+  bass.type = 'sine'
+  bass.frequency.setValueAtTime(150, t0)
+  bass.frequency.exponentialRampToValueAtTime(60, t0 + 0.12)
+  bass.connect(bassEnv)
+  bassEnv.connect(bus)
+  bass.start(t0)
+  bass.stop(t0 + 0.2)
+
+  // Blip on top — slight delay so it lands like an off-beat tick.
+  const blipDelay = 0.06
+  const blipEnv = ctx.createGain()
+  blipEnv.gain.setValueAtTime(0.0001, t0 + blipDelay)
+  blipEnv.gain.linearRampToValueAtTime(0.14, t0 + blipDelay + 0.008)
+  blipEnv.gain.setTargetAtTime(0.0001, t0 + blipDelay + 0.04, 0.05)
+  blipEnv.gain.linearRampToValueAtTime(0, t0 + blipDelay + 0.16)
+
+  const lpf = ctx.createBiquadFilter()
+  lpf.type = 'lowpass'
+  lpf.frequency.value = 3500
+  lpf.Q.value = 0.5
+
+  const blip = ctx.createOscillator()
+  blip.type = 'triangle'
+  blip.frequency.setValueAtTime(880, t0 + blipDelay)
+  blip.frequency.exponentialRampToValueAtTime(990, t0 + blipDelay + 0.08)
+  blip.connect(lpf)
+  lpf.connect(blipEnv)
+  blipEnv.connect(bus)
+  blip.start(t0 + blipDelay)
+  blip.stop(t0 + blipDelay + 0.18)
+}
+
 const RECIPES: Record<SoundName, (ctx: AudioContext, bus: GainNode) => void> = {
   pet: petCoo,
   snack: snackBlip,
@@ -272,7 +322,8 @@ const RECIPES: Record<SoundName, (ctx: AudioContext, bus: GainNode) => void> = {
   achievement: achievementChime,
   'wall-bounce': bounceTick,
   rave: raveFanfare,
-  wake: wakeHum
+  wake: wakeHum,
+  dance: danceBeat
 }
 
 /**

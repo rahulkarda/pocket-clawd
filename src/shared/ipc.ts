@@ -71,6 +71,8 @@ export const IPC = {
   AVATAR_WAVE: 'avatar:wave', // broadcast — render a wave reaction
   AVATAR_TICKLE: 'avatar:tickle', // request: trigger a tickle (from menu)
   AVATAR_TICKLE_EVENT: 'avatar:tickle-event', // broadcast — render tickle anim
+  AVATAR_DANCE: 'avatar:dance', // request: start a dance session (renderer→main)
+  AVATAR_DANCE_STATE: 'avatar:dance-state', // broadcast — dancing? + remaining ms
   AVATAR_HIGH_FIVE: 'avatar:high-five', // broadcast — render high-five anim
   AVATAR_FOOD_DROP: 'avatar:food-drop', // request: user dropped an emoji on Clawd (renderer→main)
   AVATAR_FOOD_REACTION: 'avatar:food-reaction', // broadcast — Clawd reacts to dropped food

@@ -302,18 +302,11 @@ function handleSlashCommand(input: string): { ack: string; run: () => void | Pro
     }
     case 'dance':
       return {
-        ack: '💃 dancing for 10 seconds — watch!',
+        ack: 'dancing!',
         run: () => {
-          // Local-only: poke the avatar window directly through the
-          // tickle channel which already animates a wiggle. We re-fire
-          // a few times to extend the visible bounce; full dance loop
-          // would need its own engine + sound, deferred to follow-up.
-          let n = 0
-          const id = window.setInterval(() => {
-            void window.api.avatar.tickle()
-            n++
-            if (n >= 6) window.clearInterval(id)
-          }, 1500)
+          // Main owns the dance session — animation + sound loop are
+          // driven from AVATAR_DANCE_STATE in the avatar renderer.
+          void window.api.avatar.dance()
         }
       }
     case 'me':
@@ -338,7 +331,7 @@ function handleSlashCommand(input: string): { ack: string; run: () => void | Pro
       }
     case 'tickle':
       return {
-        ack: '🤭 tickled!',
+        ack: 'tickling!',
         run: async () => {
           await window.api.avatar.tickle()
         }

@@ -525,6 +525,19 @@ export function registerIpc(actions: AppActions): void {
     lastTickleAt = now
     broadcast(IPC.AVATAR_TICKLE_EVENT, { ts: now })
     void import('./sound').then((m) => m.playSound('pet')).catch(() => undefined)
+    void import('./whisperEngine')
+      .then((m) => m.surfaceWhisper('tickle tickle!'))
+      .catch(() => undefined)
+  })
+  // Dance — main owns timing; renderer animates + loops the dance beat.
+  ipcMain.handle(IPC.AVATAR_DANCE, async (_e, payload: unknown) => {
+    const ms =
+      payload && typeof payload === 'object'
+        ? Number((payload as { durationMs?: unknown }).durationMs)
+        : NaN
+    const m = await import('./danceEngine')
+    m.startDance(Number.isFinite(ms) ? ms : undefined)
+    return { ok: true as const }
   })
   // Food drop: allow-list of single base emoji codepoints. We do NOT
   // forward the original `food` string — main re-emits a sanitized
