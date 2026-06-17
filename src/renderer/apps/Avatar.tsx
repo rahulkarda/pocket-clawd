@@ -80,6 +80,7 @@ export function Avatar(): JSX.Element {
   const [snackingUntil, setSnackingUntil] = useState<number>(0)
   const [, forceTick] = useState(0)
   const [costume, setCostume] = useState<AppSettings['costume']>('none')
+  const [mascotVariant, setMascotVariant] = useState<AppSettings['mascotVariant']>('clawd')
   const [raveActive, setRaveActive] = useState<boolean>(false)
   const [collectionItems, setCollectionItems] = useState<CollectionItem[]>([])
   const [streak, setStreak] = useState<PomodoroStreakState | null>(null)
@@ -104,6 +105,7 @@ export function Avatar(): JSX.Element {
     void window.api.settings.get().then((s) => {
       setSize(s.avatarSize)
       setCostume(s.costume ?? 'none')
+      setMascotVariant(s.mascotVariant ?? 'clawd')
       setSoundMuted(s.mute === true)
       setSoundVolume(typeof s.volume === 'number' ? s.volume : 0.6)
     })
@@ -191,6 +193,7 @@ export function Avatar(): JSX.Element {
     const offSettings = window.api.settings.onChanged((s) => {
       setSize(s.avatarSize)
       setCostume(s.costume ?? 'none')
+      setMascotVariant(s.mascotVariant ?? 'clawd')
       setSoundMuted(s.mute === true)
       setSoundVolume(typeof s.volume === 'number' ? s.volume : 0.6)
     })
@@ -315,48 +318,66 @@ export function Avatar(): JSX.Element {
   }, [])
 
   // Phase 2: figure-8 wave detector + high-five (click + space).
-  // Both run as side-effects; they don't conflict with the stroke gesture
-  // because the wave detector tracks pointermove WITHOUT requiring a
-  // pointerdown — passive hover detection.
+  // The previous version counted X and Y reversals independently per
+  // pointermove event — diagonal zigzags counted both at once. Real
+  // figure-8s alternate: X-reversal at the lobe ends, Y-reversal at
+  // the crossing. We enforce that by requiring an X-reversal to be
+  // followed by a Y-reversal (and vice versa) before counting; same-
+  // frame double-flips don't accumulate.
   useEffect(() => {
-    const xFlips: number[] = []
-    const yFlips: number[] = []
     let lastX = 0
     let lastY = 0
     let lastSignX = 0
     let lastSignY = 0
-    const WINDOW_MS = 1200
-    const NEEDED = 3
+    let alternations = 0 // count of X→Y or Y→X reversals
+    let lastReversalAxis: 'x' | 'y' | null = null
+    let firstAt = 0
+    const WINDOW_MS = 1500
+    const NEEDED = 4 // 4 alternations ≈ a real figure-8
     const onMove = (e: PointerEvent): void => {
-      // Only count when over the avatar slot.
       const slot = avatarSlotRef.current
       if (!slot) return
       const r = slot.getBoundingClientRect()
-      const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
+      const inside =
+        e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
       if (!inside) {
-        xFlips.length = 0
-        yFlips.length = 0
+        alternations = 0
+        lastReversalAxis = null
+        firstAt = 0
         return
       }
       const dx = e.clientX - lastX
       const dy = e.clientY - lastY
       const sx = dx > 1 ? 1 : dx < -1 ? -1 : 0
       const sy = dy > 1 ? 1 : dy < -1 ? -1 : 0
-      const now = Date.now()
-      if (sx !== 0 && sx !== lastSignX && lastSignX !== 0) xFlips.push(now)
-      if (sy !== 0 && sy !== lastSignY && lastSignY !== 0) yFlips.push(now)
-      if (sx !== 0) lastSignX = sx
-      if (sy !== 0) lastSignY = sy
+      // Detect a reversal on the dominant axis only — whichever has the
+      // larger magnitude. This prevents same-frame double-counting.
+      let reversedAxis: 'x' | 'y' | null = null
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        if (sx !== 0 && sx !== lastSignX && lastSignX !== 0) reversedAxis = 'x'
+        if (sx !== 0) lastSignX = sx
+      } else {
+        if (sy !== 0 && sy !== lastSignY && lastSignY !== 0) reversedAxis = 'y'
+        if (sy !== 0) lastSignY = sy
+      }
       lastX = e.clientX
       lastY = e.clientY
-      // Drop old entries.
-      while (xFlips.length && now - xFlips[0]! > WINDOW_MS) xFlips.shift()
-      while (yFlips.length && now - yFlips[0]! > WINDOW_MS) yFlips.shift()
-      if (xFlips.length >= NEEDED && yFlips.length >= NEEDED) {
-        xFlips.length = 0
-        yFlips.length = 0
-        // Fire a local wave + tell main to broadcast (so future side
-        // effects like sound or telemetry can hook in).
+      const now = Date.now()
+      if (reversedAxis && reversedAxis !== lastReversalAxis) {
+        // Genuine alternation between axes.
+        if (alternations === 0) firstAt = now
+        alternations += 1
+        lastReversalAxis = reversedAxis
+        if (now - firstAt > WINDOW_MS) {
+          // Reset stale streak.
+          alternations = 1
+          firstAt = now
+        }
+      }
+      if (alternations >= NEEDED) {
+        alternations = 0
+        lastReversalAxis = null
+        firstAt = 0
         setWaveActive(true)
         window.setTimeout(() => setWaveActive(false), 1200)
       }
@@ -794,7 +815,18 @@ export function Avatar(): JSX.Element {
             transform: funFrame
               ? `rotate(${funFrame.rotateDeg}deg) scale(${funFrame.scaleX}, ${funFrame.scaleY})`
               : undefined,
-            transformOrigin: '50% 60%'
+            transformOrigin: '50% 60%',
+            // Mascot color variant — pure CSS hue rotate over the
+            // orange-base SVG palette. Saturate slightly so the result
+            // doesn't look washed out.
+            filter:
+              mascotVariant === 'mocha'
+                ? 'hue-rotate(-30deg) saturate(0.7) brightness(0.8)'
+                : mascotVariant === 'mint'
+                  ? 'hue-rotate(110deg) saturate(0.85)'
+                  : mascotVariant === 'plum'
+                    ? 'hue-rotate(220deg) saturate(0.8)'
+                    : undefined
           }}
           // Pet wobble: tiny side-to-side bob while petting state is active.
           // Doesn't fight framer-motion variants because we animate the

@@ -7,6 +7,7 @@ let todoWin: BrowserWindow | null = null
 let settingsWin: BrowserWindow | null = null
 let companionWin: BrowserWindow | null = null
 let pomodoroWin: BrowserWindow | null = null
+let quickCaptureWin: BrowserWindow | null = null
 
 const TODO_W = 320
 const TODO_H = 380
@@ -16,6 +17,8 @@ const COMPANION_W = 560
 const COMPANION_H = 640
 const POMODORO_W = 360
 const POMODORO_H = 460
+const QUICK_W = 360
+const QUICK_H = 88
 
 function anchorAboveAvatar(w: number, h: number): { x: number; y: number } {
   const avatar = getAvatarWindow()
@@ -271,4 +274,66 @@ export function closePomodoroWindow(): void {
 
 export function getPomodoroWindow(): BrowserWindow | null {
   return pomodoroWin
+}
+
+/**
+ * Quick Capture — tiny single-input window summoned via Cmd+Shift+T.
+ * Type a todo, hit Enter, window closes and the todo is added. Esc closes.
+ * Sized to be unobtrusive; centered.
+ */
+export function createQuickCaptureWindow(): BrowserWindow {
+  if (quickCaptureWin && !quickCaptureWin.isDestroyed()) {
+    quickCaptureWin.show()
+    quickCaptureWin.moveTop()
+    quickCaptureWin.focus()
+    return quickCaptureWin
+  }
+  const display = screen.getPrimaryDisplay()
+  const { width, height } = display.workAreaSize
+  quickCaptureWin = new BrowserWindow({
+    width: QUICK_W,
+    height: QUICK_H,
+    x: Math.floor((width - QUICK_W) / 2),
+    y: Math.floor(height * 0.35),
+    frame: false,
+    transparent: false,
+    backgroundColor: '#0D0D0D',
+    resizable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    show: false,
+    title: 'Quick Capture',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  })
+  quickCaptureWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  quickCaptureWin.setAlwaysOnTop(true, 'screen-saver')
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    void quickCaptureWin.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/quick.html`)
+  } else {
+    void quickCaptureWin.loadFile(path.join(__dirname, '../renderer/quick.html'))
+  }
+  quickCaptureWin.once('ready-to-show', () => {
+    if (!quickCaptureWin) return
+    quickCaptureWin.show()
+    quickCaptureWin.moveTop()
+    quickCaptureWin.focus()
+  })
+  // Auto-close on blur — feels right for a transient pop-in.
+  quickCaptureWin.on('blur', () => {
+    if (quickCaptureWin && !quickCaptureWin.isDestroyed()) quickCaptureWin.close()
+  })
+  quickCaptureWin.on('closed', () => {
+    quickCaptureWin = null
+  })
+  return quickCaptureWin
+}
+
+export function closeQuickCaptureWindow(): void {
+  if (quickCaptureWin && !quickCaptureWin.isDestroyed()) quickCaptureWin.close()
+  quickCaptureWin = null
 }

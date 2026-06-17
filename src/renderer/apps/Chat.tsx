@@ -286,22 +286,76 @@ function handleSlashCommand(input: string): { ack: string; run: () => void | Pro
         run: () => undefined
       }
     }
+    case '8ball':
+    case '8b': {
+      const ANSWERS = [
+        'It is certain.', 'Without a doubt.', 'Yes — definitely.', 'You may rely on it.',
+        'As I see it, yes.', 'Most likely.', 'Outlook good.', 'Signs point to yes.',
+        'Reply hazy, try again.', 'Ask again later.', 'Better not tell you now.', 'Cannot predict now.',
+        "Don't count on it.", 'My reply is no.', 'My sources say no.', 'Outlook not so good.', 'Very doubtful.'
+      ]
+      const a = ANSWERS[Math.floor(Math.random() * ANSWERS.length)] ?? 'Hmm.'
+      return {
+        ack: arg ? `🎱 ${a}` : 'Ask me a yes/no question after /8ball.',
+        run: () => undefined
+      }
+    }
+    case 'dance':
+      return {
+        ack: '💃 dancing for 10 seconds — watch!',
+        run: async () => {
+          // Trigger fun mode for 10s as a stand-in dance loop.
+          await window.api.avatar.funFetch()
+        }
+      }
+    case 'me':
+    case 'journal':
+      if (!arg) {
+        return { ack: 'Type something after /me to journal it.', run: () => undefined }
+      }
+      return {
+        ack: 'saved to your journal.',
+        run: async () => {
+          await window.api.journal.append(arg)
+        }
+      }
+    case 'mute':
+    case 'unmute':
+      return {
+        ack: 'Toggled sound effects.',
+        run: async () => {
+          const s = await window.api.settings.get()
+          await window.api.settings.update({ mute: !s.mute })
+        }
+      }
+    case 'tickle':
+      return {
+        ack: '🤭 tickled!',
+        run: async () => {
+          await window.api.avatar.tickle()
+        }
+      }
     case 'help':
     case 'commands':
     case '?':
       return {
         ack: [
           'Available commands:',
-          '  /todo      — open the todo list',
-          '  /tools     — open Companion (what Clawd can do)',
-          '  /pomodoro  — open the focus timer',
-          '  /pet       — pet Clawd',
-          '  /snack     — give Clawd a snack',
-          '  /fetch     — play fetch (60s)',
-          '  /fun       — toggle fun mode',
-          '  /costume X — change costume (none, santa, shades, party, witch)',
-          '  /settings  — open Settings',
-          '  /quit      — quit Pocket Clawd'
+          '  /todo       — open the todo list',
+          '  /tools      — open Companion (what Clawd can do)',
+          '  /pomodoro   — open the focus timer',
+          '  /pet        — pet Clawd',
+          '  /snack      — give Clawd a snack',
+          '  /fetch      — play fetch (60s)',
+          '  /fun        — toggle fun mode',
+          '  /costume X  — change costume (none, santa, shades, party, witch)',
+          '  /settings   — open Settings',
+          '  /8ball <q>  — magic 8-ball answer',
+          '  /dance      — Clawd dances for 10s',
+          '  /me <text>  — write a journal entry to memory',
+          '  /mute       — toggle sound effects',
+          '  /tickle     — tickle Clawd',
+          '  /quit       — quit Pocket Clawd'
         ].join('\n'),
         run: () => undefined
       }

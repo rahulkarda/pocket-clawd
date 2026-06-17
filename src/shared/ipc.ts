@@ -23,6 +23,8 @@ export const IPC = {
   SETTINGS_WINDOW_CLOSE: 'settings-window:close',
   COMPANION_WINDOW_OPEN: 'companion-window:open',
   COMPANION_WINDOW_CLOSE: 'companion-window:close',
+  QUICK_WINDOW_OPEN: 'quick-window:open',
+  QUICK_WINDOW_CLOSE: 'quick-window:close',
 
   // ─── Companion (read-only info) ─────────────────────
   COMPANION_GET_TOOLSET: 'companion:get-toolset',
@@ -100,6 +102,7 @@ export const IPC = {
   PET_REGISTER: 'pet:register', // request: register a single pet event
   PET_GET_STATS: 'pet:get-stats',
   PET_EVENT: 'pet:event', // broadcast — fires on every pet
+  JOURNAL_APPEND: 'journal:append', // request: append a journal entry to memory dir
 
   // ─── Snack ──────────────────────────────────────────
   SNACK_GIVE: 'snack:give', // request: give Clawd a snack

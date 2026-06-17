@@ -63,6 +63,10 @@ declare global {
         open: () => Promise<void>
         close: () => Promise<void>
       }
+      quickCaptureWindow: {
+        open: () => Promise<void>
+        close: () => Promise<void>
+      }
       companion: {
         getToolset: () => Promise<ToolDescriptor[]>
         getMemoryInfo: () => Promise<MemoryInfo>
@@ -133,6 +137,9 @@ declare global {
         register: () => Promise<PetEvent>
         getStats: () => Promise<PetStats>
         onEvent: (cb: (e: PetEvent) => void) => () => void
+      }
+      journal: {
+        append: (text: string) => Promise<{ ok: boolean; file?: string; reason?: string }>
       }
       snack: {
         give: () => Promise<SnackEvent | null>

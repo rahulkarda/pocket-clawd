@@ -34,7 +34,9 @@ import {
   createCompanionWindow,
   closeCompanionWindow,
   createPomodoroWindow,
-  closePomodoroWindow
+  closePomodoroWindow,
+  createQuickCaptureWindow,
+  closeQuickCaptureWindow
 } from './secondaryWindows'
 import { resizeAvatar, getAvatarWindow, startDrag, dragTo, endDrag, getLastLayout } from './avatarWindow'
 import { showAvatarContextMenu, type AvatarMenuActions } from './avatarMenu'
@@ -170,6 +172,26 @@ export function registerIpc(actions: AppActions): void {
       const n = Number(patch.volume)
       clean.volume = Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.6
     }
+    if (patch.summaryHour !== undefined) {
+      const n = Number(patch.summaryHour)
+      clean.summaryHour = Number.isFinite(n) ? Math.max(-1, Math.min(23, Math.round(n))) : 18
+    }
+    if (patch.hourBellEnabled !== undefined) clean.hourBellEnabled = patch.hourBellEnabled === true
+    if (patch.hourBellStart !== undefined) {
+      const n = Number(patch.hourBellStart)
+      clean.hourBellStart = Number.isFinite(n) ? Math.max(0, Math.min(23, Math.round(n))) : 9
+    }
+    if (patch.hourBellEnd !== undefined) {
+      const n = Number(patch.hourBellEnd)
+      clean.hourBellEnd = Number.isFinite(n) ? Math.max(0, Math.min(24, Math.round(n))) : 18
+    }
+    if (patch.clipboardSuggestions !== undefined) clean.clipboardSuggestions = patch.clipboardSuggestions === true
+    if (patch.mascotVariant !== undefined) {
+      const allowed = ['clawd', 'mocha', 'mint', 'plum'] as const
+      clean.mascotVariant = (allowed as readonly string[]).includes(patch.mascotVariant as string)
+        ? (patch.mascotVariant as AppSettings['mascotVariant'])
+        : 'clawd'
+    }
 
     const prev = settingsStore().get()
     const next = settingsStore().update(clean)
@@ -268,6 +290,10 @@ export function registerIpc(actions: AppActions): void {
     createCompanionWindow()
   })
   ipcMain.handle(IPC.COMPANION_WINDOW_CLOSE, () => closeCompanionWindow())
+  ipcMain.handle(IPC.QUICK_WINDOW_OPEN, () => {
+    createQuickCaptureWindow()
+  })
+  ipcMain.handle(IPC.QUICK_WINDOW_CLOSE, () => closeQuickCaptureWindow())
 
   // ─── Companion (read-only info queries) ─────────────
   ipcMain.handle(IPC.COMPANION_GET_TOOLSET, () => getToolsetForCompanion())
@@ -441,34 +467,71 @@ export function registerIpc(actions: AppActions): void {
   ipcMain.handle(IPC.PET_REGISTER, () => petting.registerPet())
   ipcMain.handle(IPC.PET_GET_STATS, () => petting.getStats())
 
+  // ─── Journal append (/me slash command) ─────────────
+  ipcMain.handle(IPC.JOURNAL_APPEND, async (_e, rawText: unknown) => {
+    const text = typeof rawText === 'string' ? rawText.trim().slice(0, 4000) : ''
+    if (!text) return { ok: false, reason: 'empty' as const }
+    try {
+      const fs = await import('fs/promises')
+      const path = await import('path')
+      const root = getMemoryRoot()
+      await fs.mkdir(root, { recursive: true })
+      const file = path.join(root, 'journal.md')
+      const stamp = new Date().toISOString()
+      const line = `\n## ${stamp}\n\n${text}\n`
+      await fs.appendFile(file, line, 'utf8')
+      return { ok: true as const, file }
+    } catch (err) {
+      logger.warn('journal append failed', err)
+      return { ok: false as const, reason: 'write-failed' }
+    }
+  })
+
   // ─── Phase 2 interactions ───────────────────────────
-  // Tickle: tray / context menu fires a tickle event; renderer animates +
-  // we surface a quick whisper. No persistent counter for v1.
+  // Per-handler debounce so a tight loop in any renderer can't spam the
+  // sound engine + cross-window broadcasts. 250ms floor — fast enough for
+  // genuine human pacing, slow enough to absorb runaway loops.
+  let lastTickleAt = 0
+  let lastFoodAt = 0
   ipcMain.handle(IPC.AVATAR_TICKLE, () => {
-    broadcast(IPC.AVATAR_TICKLE_EVENT, { ts: Date.now() })
+    const now = Date.now()
+    if (now - lastTickleAt < 250) return
+    lastTickleAt = now
+    broadcast(IPC.AVATAR_TICKLE_EVENT, { ts: now })
     void import('./sound').then((m) => m.playSound('pet')).catch(() => undefined)
   })
-  // Food drop: user drag-and-dropped an emoji on the avatar window.
-  // Match against a small reaction table, broadcast the verdict to
-  // renderer so it can show the right face / particle. The renderer
-  // does its own validation (only single emoji); main re-validates the
-  // payload here as a defense-in-depth against future renderer bugs.
+  // Food drop: allow-list of single base emoji codepoints. We do NOT
+  // forward the original `food` string — main re-emits a sanitized
+  // canonical emoji from the matched list (or empty string for `meh`),
+  // so a buggy / compromised renderer can never plant arbitrary text into
+  // every other window via AVATAR_FOOD_REACTION.
+  const FOOD_LOVES = ['🥬', '🥕', '🥦', '🍓', '🥝', '🍎', '🥥']
+  const FOOD_REJECTS = ['🍕', '🍔', '🍟', '🌭', '🥩', '🍗']
   ipcMain.handle(IPC.AVATAR_FOOD_DROP, (_e, payload: unknown) => {
-    const food =
+    const now = Date.now()
+    if (now - lastFoodAt < 250) return { reaction: 'meh' as const, food: '' }
+    lastFoodAt = now
+    const raw =
       payload && typeof payload === 'object'
         ? String((payload as { emoji?: unknown }).emoji ?? '').slice(0, 8)
         : ''
-    if (!food) return { reaction: 'reject' as const, food: '' }
-    const loves = ['🥬', '🥕', '🥦', '🍓', '🥝', '🍎', '🥥']
-    const rejects = ['🍕', '🍔', '🍟', '🌭', '🥩', '🍗']
+    // Canonicalize: take just the first code-point of the raw input. The
+    // renderer also strips to 1 code-point, so this is defence-in-depth.
+    const first = Array.from(raw)[0] ?? ''
     let reaction: 'love' | 'meh' | 'reject' = 'meh'
-    if (loves.includes(food)) reaction = 'love'
-    else if (rejects.includes(food)) reaction = 'reject'
-    broadcast(IPC.AVATAR_FOOD_REACTION, { food, reaction })
+    let canonical = ''
+    if (FOOD_LOVES.includes(first)) {
+      reaction = 'love'
+      canonical = first
+    } else if (FOOD_REJECTS.includes(first)) {
+      reaction = 'reject'
+      canonical = first
+    }
+    broadcast(IPC.AVATAR_FOOD_REACTION, { food: canonical, reaction })
     if (reaction === 'love') {
       void import('./sound').then((m) => m.playSound('snack')).catch(() => undefined)
     }
-    return { reaction, food }
+    return { reaction, food: canonical }
   })
 
   // ─── Snack ──────────────────────────────────────────

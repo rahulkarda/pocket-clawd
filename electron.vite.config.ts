@@ -39,7 +39,8 @@ export default defineConfig({
           todo: resolve('src/renderer/todo.html'),
           settings: resolve('src/renderer/settings.html'),
           companion: resolve('src/renderer/companion.html'),
-          pomodoro: resolve('src/renderer/pomodoro.html')
+          pomodoro: resolve('src/renderer/pomodoro.html'),
+          quick: resolve('src/renderer/quick.html')
         }
       }
     }

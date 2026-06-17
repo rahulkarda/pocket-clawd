@@ -5,6 +5,20 @@ interface Props {
   onSend: (text: string) => void
 }
 
+/**
+ * Chat input bar.
+ *
+ * Sending:
+ *   - plain Enter sends
+ *   - Shift+Enter inserts a newline (textarea default)
+ *   - typing a line that ENDS with `\` and pressing Enter ALSO inserts a
+ *     newline (drops the trailing backslash). This matches the user's
+ *     request for "press \ + Enter for newline" without breaking the
+ *     more familiar Shift+Enter shortcut.
+ *
+ * Layout:
+ *   - textarea auto-grows up to 6 lines, then scrolls (max-h-32 cap).
+ */
 export function InputBar({ disabled, onSend }: Props): JSX.Element {
   const [value, setValue] = useState('')
 
@@ -15,10 +29,26 @@ export function InputBar({ disabled, onSend }: Props): JSX.Element {
   }
 
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key !== 'Enter') return
+    if (e.shiftKey) return // textarea inserts the newline itself
+    // Backslash-newline shortcut: line ends with `\` → drop the slash and
+    // insert a real newline instead of submitting.
+    const ta = e.currentTarget
+    const before = value.slice(0, ta.selectionStart)
+    if (before.endsWith('\\')) {
       e.preventDefault()
-      submit()
+      const after = value.slice(ta.selectionEnd)
+      const next = before.slice(0, -1) + '\n' + after
+      const caret = before.length // position right after the new \n minus the \
+      setValue(next)
+      // Move caret after the newline on the next tick.
+      requestAnimationFrame(() => {
+        ta.selectionStart = ta.selectionEnd = caret
+      })
+      return
     }
+    e.preventDefault()
+    submit()
   }
 
   return (
@@ -29,8 +59,14 @@ export function InputBar({ disabled, onSend }: Props): JSX.Element {
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={onKey}
         disabled={disabled}
-        placeholder='Type here… ("done" saves)'
-        className="flex-1 resize-none bg-bg/80 text-textMain placeholder-textMeta text-[13px] rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-accent/40 max-h-32"
+        placeholder='Type here… ("done" saves · Shift-Enter or \-Enter for newline)'
+        className="flex-1 resize-none bg-bg/80 text-textMain placeholder-textMeta text-[13px] rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-accent/40 max-h-32 overflow-y-auto"
+        style={{
+          // Auto-grow up to 6 rows (≈128px) by stretching to content;
+          // overflow scrolls past that.
+          minHeight: 38,
+          height: 'auto'
+        }}
       />
       <button
         onClick={submit}

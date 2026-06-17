@@ -61,13 +61,21 @@ class IdleTracker extends EventEmitter {
     }
   }
 
-  /** Manually mark activity (e.g. on chat input). Resets idle + sleep flags. */
+  /** Manually mark activity (e.g. on chat input). Resets idle + sleep flags
+   *  ONLY when the underlying system idle counter agrees — otherwise the
+   *  next 30s tick would re-fire 'sleeping' and we'd flap. */
   registerActivity(): void {
-    if (this.wasIdle) {
+    let idleSec = Number.POSITIVE_INFINITY
+    try {
+      idleSec = powerMonitor.getSystemIdleTime()
+    } catch {
+      // ignore — fall through to optimistic clear
+    }
+    if (this.wasIdle && idleSec < this.idleThresholdSec) {
       this.wasIdle = false
       this.emit('active')
     }
-    if (this.wasSleeping) {
+    if (this.wasSleeping && idleSec < this.sleepThresholdSec) {
       this.wasSleeping = false
       this.emit('awake')
     }

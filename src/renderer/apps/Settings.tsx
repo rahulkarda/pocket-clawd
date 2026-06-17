@@ -368,6 +368,88 @@ export function SettingsApp(): JSX.Element {
         </Section>
 
         <Section
+          title="Mascot variant"
+          hint="Color the avatar via a CSS hue shift. Costumes / costume hats stack on top."
+        >
+          <div className="flex gap-2">
+            {(['clawd', 'mocha', 'mint', 'plum'] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => update({ mascotVariant: v })}
+                className={[
+                  'px-3 py-1.5 rounded-lg text-xs border transition-colors',
+                  settings.mascotVariant === v
+                    ? 'bg-accent text-white border-accent'
+                    : 'bg-bg/60 text-textMain border-white/10 hover:bg-bg/80'
+                ].join(' ')}
+              >
+                {v[0].toUpperCase() + v.slice(1)}
+              </button>
+            ))}
+          </div>
+        </Section>
+
+        <Section
+          title="Schedules"
+          hint="Daily summary whisper, hour bell, and clipboard URL suggestions."
+        >
+          <div className="space-y-2">
+            <label className="flex items-center gap-2">
+              <span className="text-[11px] text-textMeta w-44">Daily summary at hour (-1 to disable)</span>
+              <input
+                type="number"
+                min={-1}
+                max={23}
+                value={settings.summaryHour}
+                onChange={(e) =>
+                  setSettings((s) => ({ ...s, summaryHour: Number(e.target.value) }))
+                }
+                onBlur={() => update({ summaryHour: settings.summaryHour })}
+                className="w-20 bg-bg/80 border border-white/10 text-textMain text-xs rounded-lg px-2 py-1.5 outline-none"
+              />
+            </label>
+            <Toggle
+              label="Hour bell during work hours"
+              value={settings.hourBellEnabled}
+              onChange={(v) => update({ hourBellEnabled: v })}
+            />
+            {settings.hourBellEnabled && (
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-textMeta w-12">From</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={settings.hourBellStart}
+                  onChange={(e) =>
+                    setSettings((s) => ({ ...s, hourBellStart: Number(e.target.value) }))
+                  }
+                  onBlur={() => update({ hourBellStart: settings.hourBellStart })}
+                  className="w-16 bg-bg/80 border border-white/10 text-textMain text-xs rounded-lg px-2 py-1.5 outline-none"
+                />
+                <span className="text-[11px] text-textMeta">to</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={24}
+                  value={settings.hourBellEnd}
+                  onChange={(e) =>
+                    setSettings((s) => ({ ...s, hourBellEnd: Number(e.target.value) }))
+                  }
+                  onBlur={() => update({ hourBellEnd: settings.hourBellEnd })}
+                  className="w-16 bg-bg/80 border border-white/10 text-textMain text-xs rounded-lg px-2 py-1.5 outline-none"
+                />
+              </div>
+            )}
+            <Toggle
+              label="Suggest summarizing copied URLs"
+              value={settings.clipboardSuggestions}
+              onChange={(v) => update({ clipboardSuggestions: v })}
+            />
+          </div>
+        </Section>
+
+        <Section
           title="Pomodoro"
           hint="Classic 25/5/15. Right-click Clawd → Pomodoro to open the timer."
         >

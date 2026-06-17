@@ -80,6 +80,11 @@ const api = {
     close: (): Promise<void> => ipcRenderer.invoke(IPC.COMPANION_WINDOW_CLOSE)
   },
 
+  quickCaptureWindow: {
+    open: (): Promise<void> => ipcRenderer.invoke(IPC.QUICK_WINDOW_OPEN),
+    close: (): Promise<void> => ipcRenderer.invoke(IPC.QUICK_WINDOW_CLOSE)
+  },
+
   // ─── Companion (read-only info queries) ─────────────
   companion: {
     getToolset: (): Promise<ToolDescriptor[]> => ipcRenderer.invoke(IPC.COMPANION_GET_TOOLSET),
@@ -249,6 +254,12 @@ const api = {
       ipcRenderer.on(IPC.PET_EVENT, listener)
       return () => ipcRenderer.off(IPC.PET_EVENT, listener)
     }
+  },
+
+  // ─── Journal (/me slash command) ────────────────────
+  journal: {
+    append: (text: string): Promise<{ ok: boolean; file?: string; reason?: string }> =>
+      ipcRenderer.invoke(IPC.JOURNAL_APPEND, text)
   },
 
   // ─── Snack ──────────────────────────────────────────

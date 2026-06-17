@@ -21,7 +21,7 @@ import { applyHotkeyFromSettings, broadcast, registerIpc } from './ipcHandlers'
 import idleTracker from './idleTracker'
 import { fireImmediate, startWhisperEngine, stopWhisperEngine } from './whisperEngine'
 import { startRolloverTicker, getDaily, onChange as onTodoChange } from './todoStore'
-import { unregisterAllHotkeys } from './hotkey'
+import { unregisterAllHotkeys, registerExtraHotkey } from './hotkey'
 import { configureAutoUpdater } from './updater'
 import { IPC } from '@shared/ipc'
 import type { AvatarAnimState } from '@shared/types'
@@ -195,6 +195,14 @@ async function bootstrap(): Promise<void> {
   // ─── Emote engine (CPU-load watch) ──────────────────
   void import('./emoteEngine').then((m) => m.start())
 
+  // ─── Background schedulers (daily summary, hour bell, clipboard) ─
+  void import('./schedulers').then((m) => m.startSchedulers())
+
+  // ─── Quick capture global shortcut (Cmd+Shift+T) ────
+  registerExtraHotkey('CommandOrControl+Shift+T', () => {
+    void import('./secondaryWindows').then((m) => m.createQuickCaptureWindow())
+  })
+
   // ─── Wake greetings ──────────────────────────────────
   // After resuming from sleep, surface a friendly "welcome back" via the
   // whisper pipeline. Throttled by the OS so spurious resumes won't spam.
@@ -347,6 +355,8 @@ app.on('will-quit', () => {
   void import('./achievements').then((m) => m.shutdown())
   // Emote engine.
   void import('./emoteEngine').then((m) => m.shutdown())
+  // Background schedulers.
+  void import('./schedulers').then((m) => m.shutdown())
   if (apiKeyWatchInterval) {
     clearInterval(apiKeyWatchInterval)
     apiKeyWatchInterval = null

@@ -95,6 +95,16 @@ export interface AppSettings {
   mute: boolean
   /** Master volume 0..1 for synthesized sounds. */
   volume: number
+  /** Hour-of-day (0-23) when daily summary whisper fires. -1 disables. */
+  summaryHour: number
+  /** Smart hour bell — chime at the top of every work hour. */
+  hourBellEnabled: boolean
+  hourBellStart: number // 0-23
+  hourBellEnd: number // 0-23 (exclusive end)
+  /** Clipboard listener — when a URL is copied, suggest summarizing it. */
+  clipboardSuggestions: boolean
+  /** Mascot color variant. Applied as CSS hue-rotate over the orange Clawd. */
+  mascotVariant: 'clawd' | 'mocha' | 'mint' | 'plum'
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -128,7 +138,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   birthday: null,
   wakeGreetings: true,
   mute: false,
-  volume: 0.6
+  volume: 0.6,
+  summaryHour: 18,
+  hourBellEnabled: false,
+  hourBellStart: 9,
+  hourBellEnd: 18,
+  clipboardSuggestions: false,
+  mascotVariant: 'clawd'
 }
 
 // ──────────────────────────────────────────────────────────
