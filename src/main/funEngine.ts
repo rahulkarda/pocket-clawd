@@ -56,6 +56,10 @@ interface FunState {
   scaleX: number
   /** When set, fun mode auto-stops at this wall-clock ms. Used by "fetch". */
   autoStopAt: number
+  /** Last window origin we sent to setPosition. Tick skips the call when
+   *  neither coord changed — avoids window-server thrash at edges. */
+  lastWinX: number
+  lastWinY: number
 }
 
 const state: FunState = {
@@ -71,7 +75,9 @@ const state: FunState = {
   rotateDeg: 0,
   scaleY: 1,
   scaleX: 1,
-  autoStopAt: 0
+  autoStopAt: 0,
+  lastWinX: Number.NaN,
+  lastWinY: Number.NaN
 }
 
 const TICK_MS = 16 // ~60 Hz
@@ -338,15 +344,23 @@ function tick(): void {
   // Treat the bottom of the work area as the floor.
   const floor = dy + dh - avatarSize - 4
 
+  // Minimum bounce velocity at the side walls. Without this, low-energy
+  // hits (after several wall bounces with damping) leave |vx| tiny but
+  // non-zero — the avatar gets pinned at the edge and ticks back-and-forth
+  // through sub-pixel motion, which the macOS compositor renders as
+  // visible flicker on the transparent always-on-top window.
+  const MIN_WALL_BOUNCE_VX = 60
   if (state.ax < minX) {
     state.ax = minX
-    state.vx = Math.abs(state.vx) * BOUNCE_DAMPING
+    const v = Math.abs(state.vx) * BOUNCE_DAMPING
+    state.vx = v < MIN_WALL_BOUNCE_VX ? MIN_WALL_BOUNCE_VX : v
     // playful kick: spin a bit on wall hit
     state.rotateDeg += 25
     void import('./sound').then((m) => m.playSound('wall-bounce')).catch(() => undefined)
   } else if (state.ax > maxX) {
     state.ax = maxX
-    state.vx = -Math.abs(state.vx) * BOUNCE_DAMPING
+    const v = Math.abs(state.vx) * BOUNCE_DAMPING
+    state.vx = -(v < MIN_WALL_BOUNCE_VX ? MIN_WALL_BOUNCE_VX : v)
     state.rotateDeg -= 25
     void import('./sound').then((m) => m.playSound('wall-bounce')).catch(() => undefined)
   }
@@ -393,7 +407,17 @@ function tick(): void {
     stop()
     return
   }
-  win.setPosition(windowOriginX, windowOriginY, false)
+  // Skip the setPosition call entirely if neither coord changed since the
+  // last tick. macOS' window server still does work for a no-op move
+  // (re-evaluates space membership, shadow region, occlusion), and at 60Hz
+  // that work piles up enough to produce visible compositor stutter on
+  // transparent always-on-top windows — what users perceive as the
+  // "fade out and back" flicker right when fun mode kicks in.
+  if (windowOriginX !== state.lastWinX || windowOriginY !== state.lastWinY) {
+    win.setPosition(windowOriginX, windowOriginY, false)
+    state.lastWinX = windowOriginX
+    state.lastWinY = windowOriginY
+  }
 
   broadcastFrame()
 }
@@ -437,6 +461,10 @@ export function start(): void {
   state.scaleX = 1
   state.scaleY = 1
   state.current = null
+  // Reset the position cache so the very first tick always fires a real
+  // setPosition (our same-coord skip would otherwise no-op the move).
+  state.lastWinX = Number.NaN
+  state.lastWinY = Number.NaN
   // Anchor lastTickAt slightly in the past so the first dt is non-zero and
   // physics actually advances on the first tick.
   state.lastTickAt = Date.now() - TICK_MS
