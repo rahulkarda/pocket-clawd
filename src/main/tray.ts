@@ -98,6 +98,12 @@ export function createTray(actions: TrayActions): Tray {
         label: 'Play fetch (60s) 🎾',
         click: () => funEngine.playFetch(60_000)
       },
+      {
+        label: 'Play chess ♟',
+        click: () => {
+          void import('./secondaryWindows').then((m) => m.createChessWindow())
+        }
+      },
       { type: 'separator' },
       { label: 'Quit Clawd', role: 'quit', click: () => actions.onQuit() }
     ])

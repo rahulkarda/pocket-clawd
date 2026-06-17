@@ -59,7 +59,7 @@ export function InputBar({ disabled, onSend }: Props): JSX.Element {
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={onKey}
         disabled={disabled}
-        placeholder='Type here…  (Enter sends · Shift-Enter for newline)'
+        placeholder='Chat with Clawd…'
         className="flex-1 resize-none bg-bg/80 text-textMain placeholder-textMeta text-[13px] rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-accent/40 max-h-32 overflow-y-auto"
         style={{
           // Auto-grow up to 6 rows (≈128px) by stretching to content;

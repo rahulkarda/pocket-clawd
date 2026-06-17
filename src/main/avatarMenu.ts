@@ -89,6 +89,12 @@ export function showAvatarContextMenu(win: BrowserWindow, actions: AvatarMenuAct
       click: () => funEngine.playFetch(60_000)
     },
     {
+      label: 'Play chess ♟',
+      click: () => {
+        void import('./secondaryWindows').then((m) => m.createChessWindow())
+      }
+    },
+    {
       label: settings.mute ? '🔊 Sounds on' : '🔇 Mute sounds',
       click: () => {
         settingsStore().update({ mute: !settings.mute })
