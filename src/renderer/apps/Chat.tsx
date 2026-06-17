@@ -250,11 +250,26 @@ function handleSlashCommand(input: string): { ack: string; run: () => void | Pro
         }
       }
     case 'fetch':
-    case 'play':
       return {
         ack: 'Throwing the ball! Clawd will romp for 60 seconds.',
         run: async () => {
           await window.api.avatar.funFetch()
+        }
+      }
+    case 'play':
+      // /play is continuous (no auto-stop) — same as /fun. Use /fetch
+      // for the 60-second ball-throw session. (Previously /play was
+      // aliased to /fetch and stopped after a minute, which surprised
+      // people.) Click Clawd to stop.
+      return {
+        ack: 'Play mode! Click Clawd to stop.',
+        run: async () => {
+          // Only toggle ON; if it's already on, leave it on.
+          const s = await window.api.avatar.funToggle()
+          // funToggle returns the new active state — if the call flipped
+          // it OFF, flip back ON so /play is idempotent (always ends in
+          // play mode). One extra IPC round-trip in the rare case is fine.
+          if (!s) await window.api.avatar.funToggle()
         }
       }
     case 'fun':
@@ -432,7 +447,8 @@ function handleSlashCommand(input: string): { ack: string; run: () => void | Pro
           '  /pomodoro   — open the focus timer',
           '  /pet        — pet Clawd',
           '  /snack      — give Clawd a snack',
-          '  /fetch      — play fetch (60s)',
+          '  /fetch      — play fetch (60s, ball overlay)',
+          '  /play       — continuous play (click Clawd to stop)',
           '  /fun        — toggle fun mode',
           '  /costume X  — change costume (none, santa, shades, party, witch)',
           '  /settings   — open Settings',

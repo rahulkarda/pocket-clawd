@@ -1013,7 +1013,7 @@ export function Avatar(): JSX.Element {
           )}
         </AnimatePresence>
 
-        {/* Wave reaction — ✋ briefly above Clawd's head. */}
+        {/* Wave reaction — 👋 briefly above Clawd's head (tilted waving hand). */}
         <AnimatePresence>
           {waveActive && (
             <motion.div
@@ -1025,7 +1025,7 @@ export function Avatar(): JSX.Element {
               exit={{ opacity: 0, x: '-50%', y: -8 }}
               transition={{ duration: 1.0 }}
             >
-              ✋
+              👋
             </motion.div>
           )}
         </AnimatePresence>

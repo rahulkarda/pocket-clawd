@@ -381,9 +381,6 @@ export function CompanionApp(): JSX.Element {
               <span className="text-textMain font-medium">Wake greeting</span> — when your Mac wakes from sleep, Clawd whispers a short hello.
             </li>
             <li>
-              <span className="text-textMain font-medium">Emote reactions</span> — Clawd shows a 😅 emote when system load is high.
-            </li>
-            <li>
               <span className="text-textMain font-medium">Achievements</span> — earn badges for petting, snacking, pomodoros, daily todos. See them above this section.
             </li>
             <li>
