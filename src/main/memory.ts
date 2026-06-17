@@ -388,3 +388,12 @@ export async function clearMemory(): Promise<void> {
 export function getMemoryRoot(): string {
   return memoryRoot()
 }
+
+/**
+ * Public symlink-escape guard reused by JOURNAL_APPEND (and any future
+ * direct writer) so user-data paths can't be redirected via a symlink
+ * dropped at the target by a separate process.
+ */
+export async function assertWithinMemoryRoot(abs: string): Promise<void> {
+  await assertNoSymlinkEscape(abs)
+}

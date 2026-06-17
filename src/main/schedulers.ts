@@ -5,6 +5,7 @@
  * disable independently.
  */
 import { clipboard } from 'electron'
+import { createHash } from 'crypto'
 import { settingsStore } from './settings'
 import { playSound } from './sound'
 import logger from './logger'
@@ -14,7 +15,13 @@ let bellTimer: NodeJS.Timeout | null = null
 let clipboardTimer: NodeJS.Timeout | null = null
 let lastSummaryDate = '' // YYYY-MM-DD of the last fired summary
 let lastBellHour = -1
-let lastClipboardText = ''
+// Store a fingerprint, not the plaintext, so a copied secret doesn't
+// linger in main-process memory longer than necessary.
+let lastClipboardFingerprint = ''
+
+function fingerprint(text: string): string {
+  return createHash('sha1').update(text).digest('hex')
+}
 
 function todayKey(): string {
   const d = new Date()
@@ -94,8 +101,10 @@ function checkClipboard(): void {
     return
   }
   text = text.trim()
-  if (!text || text === lastClipboardText) return
-  lastClipboardText = text
+  if (!text) return
+  const fp = fingerprint(text)
+  if (fp === lastClipboardFingerprint) return
+  lastClipboardFingerprint = fp
   // Only react to URLs.
   if (!/^https?:\/\/\S+$/i.test(text)) return
   void whisper(`Copied a URL — open chat and ask me to summarize it.`)
@@ -103,6 +112,16 @@ function checkClipboard(): void {
 
 export function startSchedulers(): void {
   if (summaryTimer || bellTimer || clipboardTimer) return
+  // Prime the clipboard fingerprint with whatever's already on the
+  // clipboard at boot, so a URL the user copied minutes ago in another
+  // app doesn't surface a phantom "summarize this?" whisper as soon as
+  // Clawd starts. Only diffs-after-boot fire.
+  try {
+    const existing = clipboard.readText()?.trim() ?? ''
+    if (existing) lastClipboardFingerprint = fingerprint(existing)
+  } catch {
+    // ignore
+  }
   // Coarse 60s tick handles both summary and bell.
   summaryTimer = setInterval(() => {
     checkSummary()

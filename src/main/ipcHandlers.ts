@@ -9,7 +9,7 @@ import * as keychain from './keychain'
 import { settingsStore } from './settings'
 import { resetClient, streamChat } from './anthropicClient'
 import { extractSpec, stripSpecBlock, writeSpec, setLastSpec } from './specWriter'
-import { clearMemory, getMemoryRoot, getMemoryStats } from './memory'
+import { clearMemory, getMemoryRoot, getMemoryStats, assertWithinMemoryRoot } from './memory'
 import idleTracker from './idleTracker'
 import {
   addTodo,
@@ -378,7 +378,16 @@ export function registerIpc(actions: AppActions): void {
 
   // ─── Todos ──────────────────────────────────────────
   ipcMain.handle(IPC.TODO_LIST, () => getDaily())
-  ipcMain.handle(IPC.TODO_ADD, (_e, text: string) => addTodo(text))
+  ipcMain.handle(IPC.TODO_ADD, (_e, text: unknown) => {
+    // Runtime type-check — IPC payloads are crossing a trust boundary
+    // and the TS annotation is erased. addTodo() calls .trim() on the
+    // input, which would throw for non-string and surface as an
+    // unhandled IPC rejection.
+    if (typeof text !== 'string') {
+      throw new Error('TODO_ADD: text must be a string')
+    }
+    return addTodo(text.slice(0, 500))
+  })
   ipcMain.handle(IPC.TODO_TOGGLE, (_e, id: string) => {
     toggleTodo(id)
     idleTracker.registerActivity()
@@ -473,13 +482,30 @@ export function registerIpc(actions: AppActions): void {
     if (!text) return { ok: false, reason: 'empty' as const }
     try {
       const fs = await import('fs/promises')
+      const fsSync = await import('fs')
       const path = await import('path')
       const root = getMemoryRoot()
       await fs.mkdir(root, { recursive: true })
       const file = path.join(root, 'journal.md')
+      // Symlink-escape guard: refuse to write if `journal.md` (or any
+      // ancestor) has been turned into a symlink pointing outside the
+      // memory root. Mirrors the protection the memory tool already has.
+      await assertWithinMemoryRoot(file)
       const stamp = new Date().toISOString()
       const line = `\n## ${stamp}\n\n${text}\n`
-      await fs.appendFile(file, line, 'utf8')
+      // O_NOFOLLOW blocks following a symlink at the leaf even if a race
+      // dropped one between the assert above and this open. macOS + Linux
+      // both honor it; on platforms where it's missing we fall back to
+      // assertWithinMemoryRoot's check alone.
+      const c = fsSync.constants
+      // eslint-disable-next-line no-bitwise
+      const flags = c.O_WRONLY | c.O_CREAT | c.O_APPEND | (c.O_NOFOLLOW ?? 0)
+      const fd = await fs.open(file, flags, 0o600)
+      try {
+        await fd.appendFile(line, 'utf8')
+      } finally {
+        await fd.close()
+      }
       return { ok: true as const, file }
     } catch (err) {
       logger.warn('journal append failed', err)
